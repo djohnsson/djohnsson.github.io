@@ -1289,8 +1289,27 @@ const Sound = {
   _ctx: null, nodes: [],
   ctx() {
     if (!this._ctx) this._ctx = new AudioContext();
-    if (this._ctx.state === 'suspended') this._ctx.resume();
+    // iOS also uses 'interrupted' (after a call, or when the app was in the background).
+    if (this._ctx.state !== 'running') this._ctx.resume().catch(() => {});
     return this._ctx;
+  },
+  /**
+   * Called from every tap, click and key press. Mobile browsers only start audio inside a user
+   * gesture, and iOS mutes web audio with the ring/silent switch unless the page asks for
+   * media playback.
+   */
+  unlock() {
+    if (navigator.audioSession && navigator.audioSession.type !== 'playback') {
+      try { navigator.audioSession.type = 'playback'; } catch (e) { /* older Safari */ }
+    }
+    const c = this.ctx();
+    if (this.unlocked) return;
+    this.unlocked = true;
+    // A one-sample silent buffer started inside the gesture is what older iOS needs to wake up.
+    const src = c.createBufferSource();
+    src.buffer = c.createBuffer(1, 1, c.sampleRate);
+    src.connect(c.destination);
+    src.start(0);
   },
   at(tPerf) { const c = this.ctx(); return Math.max(c.currentTime, c.currentTime + (tPerf - performance.now()) / 1000); },
   click(tPerf, accent) {
@@ -2917,7 +2936,7 @@ function boot() {
   window.addEventListener('keydown', e => onKey(e, true));
   window.addEventListener('keyup', e => onKey(e, false));
   window.addEventListener('resize', () => { if (currentView === 'drill') drawScoreOnly(); });
-  document.addEventListener('pointerdown', () => Sound.ctx(), { once: true });
+  for (const type of ['pointerdown', 'touchend', 'click', 'keydown']) document.addEventListener(type, () => Sound.unlock(), { capture: true });
   window.addEventListener('pagehide', () => Sound.stopAll());
   qwertyInfo();
   const vol = document.getElementById('piano-vol');
