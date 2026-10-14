@@ -2055,9 +2055,11 @@ function loadEditorState() {
   const d = Store.data.draft;
   ED = d && Array.isArray(d.notes) ? { ...blankEditor(), ...d, snapshot: null } : blankEditor();
 }
+// Only the fields from blankEditor() persist. ED also holds runtime state (the VexFlow layout,
+// the Listen timer, the undo snapshot); the layout is circular and made the whole save fail.
 function saveDraft() {
-  const { snapshot, ...rest } = ED;
-  Store.data.draft = rest;
+  const keys = Object.keys(blankEditor()).filter(k => k !== 'snapshot');
+  Store.data.draft = Object.fromEntries(keys.map(k => [k, ED[k]]));
   Store.save();
 }
 function edChanged() { ED.dirty = true; saveDraft(); drawEditor(); }
