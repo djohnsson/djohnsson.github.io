@@ -1,0 +1,2935 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Piano Trainer</title>
+<style>
+:root {
+  --bg: #f6f5f2; --panel: #ffffff; --ink: #1c1c1e; --muted: #6b6b70; --line: #e2e0da;
+  --accent: #2563eb; --accent-soft: #dbe7fd; --ok: #16a34a; --bad: #dc2626; --warn: #d97706;
+  --rh: #2563eb; --lh: #a16207;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #17171a; --panel: #222226; --ink: #ececef; --muted: #9a9aa3; --line: #34343a;
+    --accent: #6ea0ff; --accent-soft: #24324d; color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 6px 12px; }
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.ghost { background: transparent; border-color: transparent; }
+button:disabled { opacity: .5; cursor: default; }
+select, input[type=number] { border: 1px solid var(--line); background: var(--panel); border-radius: 6px; padding: 4px 6px; }
+h1, h2, h3 { margin: 0 0 8px; line-height: 1.2; }
+h2 { font-size: 20px; } h3 { font-size: 16px; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+header.top .brand { font-weight: 700; font-size: 17px; margin-right: 8px; }
+header.top nav { display: flex; gap: 4px; }
+header.top .chips { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.chip.on { color: var(--ok); border-color: var(--ok); }
+.chip.warn { color: var(--warn); border-color: var(--warn); }
+.chip.vol { display: inline-flex; align-items: center; gap: 6px; }
+.chip.vol input { width: 90px; }
+
+main { max-width: 1200px; margin: 0 auto; padding: 16px; padding-bottom: 200px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.spacer { flex: 1; }
+
+.levels { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.lvl { display: flex; align-items: center; gap: 8px; text-align: left; width: 100%; padding: 6px 10px; }
+.lvl .n { width: 22px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lvl .t { flex: 1; }
+.lvl .stars { color: #e0a800; letter-spacing: 1px; font-size: 13px; }
+.lvl.locked { opacity: .55; }
+.lvl.current { border-color: var(--accent); background: var(--accent-soft); }
+
+.session li { display: flex; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.session li:last-child { border-bottom: 0; }
+.session ol { list-style: none; margin: 0; padding: 0; }
+.session .done { color: var(--ok); font-weight: 700; width: 18px; }
+
+.drill-head { display: flex; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; }
+.seg button.sel { background: var(--accent); color: #fff; }
+.status { font-size: 16px; min-height: 24px; margin: 8px 0; }
+.status b { color: var(--accent); }
+.score-wrap { background: #fff; border-radius: 10px; border: 1px solid var(--line); overflow: auto; max-height: 58vh; position: relative; }
+.score-wrap svg { display: block; }
+.label-card { color: #111; text-align: center; padding: 40px 10px; }
+.label-card .big { font-size: 64px; font-weight: 700; }
+.label-card .sub { color: #666; }
+.theory { border-left: 4px solid var(--accent); }
+.theory p, .theory ul { margin: 6px 0; }
+.results { border: 2px solid var(--line); }
+.results.pass { border-color: var(--ok); }
+.results.fail { border-color: var(--warn); }
+.results .big { font-size: 28px; font-weight: 700; }
+.stats { display: flex; gap: 24px; flex-wrap: wrap; margin: 8px 0; }
+.stats div span { display: block; font-size: 12px; color: var(--muted); }
+
+#kbd-dock { position: fixed; left: 0; right: 0; bottom: 0; z-index: 4; background: var(--panel); border-top: 1px solid var(--line); padding: 6px 8px 8px; }
+#kbd-dock .kbd-info { display: flex; gap: 12px; font-size: 12px; color: var(--muted); padding: 0 4px 4px; }
+#kbd-dock .kbd-info { align-items: center; }
+#kbd-toggle { padding: 2px 8px; }
+#kbd svg { display: block; width: 100%; touch-action: none; user-select: none; }
+.k { stroke: #555; stroke-width: 1; }
+.k.w { fill: #fff; } .k.b { fill: #222; }
+/* Hints are pale with a strong outline in the hand's colour; feedback is solid colour.
+   Held keys are grey, so a held wrong key never looks like a blue right-hand hint. */
+.k.hint-rh { fill: #bfdbfe; stroke: #2563eb; stroke-width: 2.5; } .k.b.hint-rh { fill: #3b67b8; stroke: #93c5fd; }
+.k.hint-lh { fill: #fef08a; stroke: #a16207; stroke-width: 2.5; } .k.b.hint-lh { fill: #ca8a04; stroke: #fde047; }
+.k.down { fill: #d1d5db; } .k.b.down { fill: #6b7280; }
+.k.good { fill: #4ade80; stroke: #15803d; stroke-width: 2; } .k.b.good { fill: #16a34a; }
+.k.bad { fill: #dc2626; stroke: #450a0a; stroke-width: 3; } .k.b.bad { fill: #ef4444; stroke: #450a0a; }
+.nav-focus { outline: 3px solid var(--accent); outline-offset: 2px; }
+.klabel { font-size: 10px; fill: #888; pointer-events: none; }
+
+#load-error { background: #fee2e2; color: #7f1d1d; padding: 12px 16px; border-bottom: 1px solid #fca5a5; }
+.toast { position: fixed; top: 60px; right: 16px; z-index: 10; background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 8px; }
+table.set { border-collapse: collapse; width: 100%; }
+table.set td { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.set td:first-child { width: 40%; }
+</style>
+</head>
+<body>
+<div id="load-error" hidden></div>
+<header class="top">
+  <span class="brand">🎹 Piano Trainer</span>
+  <nav>
+    <button class="ghost" data-nav="home">Home</button>
+    <button class="ghost" data-nav="echo">Echo</button>
+    <button class="ghost" data-nav="record">Record</button>
+    <button class="ghost" data-nav="theory">Theory</button>
+    <button class="ghost" data-nav="settings">Settings</button>
+  </nav>
+  <div class="chips">
+    <label class="chip vol" id="chip-vol" hidden title="Piano volume, sent over MIDI">Piano 🔊 <input type="range" id="piano-vol" min="0" max="1" step="0.05"></label>
+    <span class="chip on" id="chip-awake" hidden title="The screen will not dim or lock while you play">☀ Screen stays on</span>
+    <span class="chip on" id="chip-nav" hidden>Navigate: F7 ◀◀ · G7 ◀ · G♯7 press · A7 ▶ · B7 ▶▶ · E7 Home · C8 done</span>
+    <span class="chip" id="chip-midi">MIDI: –</span>
+    <span class="chip" id="chip-pedal" hidden>Pedal</span>
+    <span class="chip" id="chip-mic" hidden>Mic</span>
+  </div>
+</header>
+<main id="view"></main>
+<div id="kbd-dock">
+  <div class="kbd-info"><span id="kbd-held">&nbsp;</span><span class="spacer"></span><span id="kbd-qwerty"></span><button class="ghost small" id="kbd-toggle"></button></div>
+  <div id="kbd"></div>
+</div>
+
+<script>window.__vfFailed = false;</script>
+<!-- VexFlow 4.2.5 from jsDelivr. The SRI digest was computed from the downloaded file;
+     its SHA-256 matched the hash jsDelivr publishes for this path. cdnjs is not used
+     because its "4.x" vexflow files are actually the 3.0.9 build. -->
+<script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.5/build/cjs/vexflow.js"
+        integrity="sha384-hTp5EB4x3B2hpyg2cOUxiLQjsEiWr0zbn6ABKZvaJm4hMThks7+F9ruInnkC3Vse"
+        crossorigin="anonymous" onerror="window.__vfFailed = true"></script>
+<script>
+'use strict';
+
+/* =========================================================================
+   Utilities
+   ========================================================================= */
+const rand = n => Math.floor(Math.random() * n);
+const pick = arr => arr[rand(arr.length)];
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const mod = (a, n) => ((a % n) + n) % n;
+const today = () => new Date().toLocaleDateString('sv-SE');
+
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (k === 'class') el.className = v;
+    else if (k === 'html') el.innerHTML = v;
+    else if (k === 'value') el.value = v;
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid == null || kid === false) continue;
+    el.append(kid.nodeType ? kid : String(kid));
+  }
+  return el;
+}
+
+function toast(msg, ms = 2200) {
+  const t = h('div', { class: 'toast' }, msg);
+  document.body.append(t);
+  setTimeout(() => t.remove(), ms);
+}
+
+/* =========================================================================
+   Music theory
+   ========================================================================= */
+const LETTERS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+const LETTER_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+const ACC_OFFSET = { '': 0, '#': 1, '##': 2, 'b': -1, 'bb': -2, 'n': 0 };
+const MAJOR = [0, 2, 4, 5, 7, 9, 11];
+const NAT_MINOR = [0, 2, 3, 5, 7, 8, 10];
+const SHARP_ORDER = 'FCGDAEB';
+const FLAT_ORDER = 'BEADGCF';
+const KEY_COUNT = { C: 0, G: 1, D: 2, A: 3, E: 4, B: 5, F: -1, Bb: -2, Eb: -3, Ab: -4, Db: -5,
+  Am: 0, Em: 1, Bm: 2, Dm: -1, Gm: -2, Cm: -3 };
+
+function parsePitch(name) {
+  const m = /^([A-G])(##|#|bb|b|n)?(-?\d)$/.exec(name);
+  if (!m) throw new Error('Bad pitch: ' + name);
+  const acc = m[2] === 'n' ? '' : (m[2] || '');
+  return { letter: m[1], acc, oct: +m[3], midi: (+m[3] + 1) * 12 + LETTER_PC[m[1]] + ACC_OFFSET[acc] };
+}
+const midiOf = name => parsePitch(name).midi;
+const isBlack = m => [1, 3, 6, 8, 10].includes(mod(m, 12));
+const handOf = m => (m < 60 ? 'lh' : 'rh');
+const SHARP_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const midiName = m => SHARP_NAMES[mod(m, 12)] + (Math.floor(m / 12) - 1);
+const pretty = s => String(s).replace(/#/g, '♯').replace(/([A-G])b/g, '$1♭');
+
+function keyAccMap(key) {
+  const n = KEY_COUNT[key] || 0;
+  const map = {};
+  for (const L of LETTERS) map[L] = '';
+  if (n > 0) for (let i = 0; i < n; i++) map[SHARP_ORDER[i]] = '#';
+  if (n < 0) for (let i = 0; i < -n; i++) map[FLAT_ORDER[i]] = 'b';
+  return map;
+}
+
+/** Spell a 7-note scale with one letter per degree, so G major gets F# (not Gb). */
+function spellScale(tonic, steps = MAJOR) {
+  const t = /^([A-G])(#|b)?$/.exec(tonic);
+  const li = LETTERS.indexOf(t[1]);
+  const tpc = mod(LETTER_PC[t[1]] + ACC_OFFSET[t[2] || ''], 12);
+  return steps.map((s, i) => {
+    const L = LETTERS[(li + i) % 7];
+    let d = mod(tpc + s - LETTER_PC[L], 12);
+    if (d > 6) d -= 12;
+    return L + { '-2': 'bb', '-1': 'b', '0': '', '1': '#', '2': '##' }[d];
+  });
+}
+
+/** Ascending run of scale notes with octaves, e.g. scaleRun('G', 4, 5) -> G4 A4 B4 C5 D5. */
+function scaleRun(tonic, oct, count, steps = MAJOR) {
+  const sc = spellScale(tonic, steps);
+  const li = LETTERS.indexOf(tonic[0]);
+  const out = [];
+  for (let i = 0; i < count; i++) out.push(sc[i % 7] + (oct + Math.floor((li + i) / 7)));
+  return out;
+}
+
+/** Give each pitch class an octave so the notes rise from `oct`. */
+function stackUp(pcs, oct) {
+  const out = [];
+  let prev = -Infinity;
+  for (const pc of pcs) {
+    let o = oct;
+    while (midiOf(pc + o) <= prev) o++;
+    out.push(pc + o);
+    prev = midiOf(pc + o);
+  }
+  return out;
+}
+function placeBelow(pc, ref) { for (let o = 9; o >= 0; o--) if (midiOf(pc + o) < ref) return pc + o; }
+function placeAbove(pc, ref) { for (let o = 0; o <= 9; o++) if (midiOf(pc + o) > ref) return pc + o; }
+
+function triad(root, minor = false) {
+  const sc = spellScale(root, minor ? NAT_MINOR : MAJOR);
+  return [sc[0], sc[2], sc[4]];
+}
+
+/** Left-hand I, IV and V7 in "close" position, as taught in beginner books (C: C-E-G, C-F-A, B-F-G). */
+function lhProgression(key, oct) {
+  const sc = spellScale(key);
+  const I = stackUp([sc[0], sc[2], sc[4]], oct);
+  const root = midiOf(I[0]);
+  const f4 = placeAbove(sc[3], root);
+  const IV = [I[0], f4, placeAbove(sc[5], midiOf(f4))];
+  const V7 = [placeBelow(sc[6], root), f4, placeAbove(sc[4], midiOf(f4))];
+  return { I, IV, V7 };
+}
+
+/* =========================================================================
+   Score format
+   Voice string: tokens separated by spaces, bars by "|".
+     E4q  quarter E4        C3+E3+G3h  chord (half)      rq  quarter rest
+     D4q. dotted quarter    E4q:3      finger 3          xq  any key (rhythm)
+     gq   invisible spacer  C4+E4h"Maj_3rd"  label below/above the note (_ = space)
+     C4h~ tied to the next note in the same hand, which is then held, not played again
+   ========================================================================= */
+const DUR_BEATS = { w: 4, h: 2, q: 1, e: 0.5, s: 0.25 };
+
+function parseVoice(str) {
+  const measures = [[]];
+  for (const tok of str.trim().split(/\s+/)) {
+    if (!tok) continue;
+    if (tok === '|') { measures.push([]); continue; }
+    const m = /^(.+?)([whqes])(\.?)(~?)(?::([\d,]+))?(?:"([^"]*)")?$/.exec(tok);
+    if (!m) throw new Error('Bad token: ' + tok);
+    const ev = { dur: m[2], dots: m[3] ? 1 : 0 };
+    ev.beats = DUR_BEATS[ev.dur] * (ev.dots ? 1.5 : 1);
+    if (m[4]) ev.tie = true;
+    if (m[5]) ev.fingers = m[5].split(',').map(Number);
+    if (m[6]) ev.label = m[6].replace(/_/g, ' ');
+    if (m[1] === 'r') ev.rest = true;
+    else if (m[1] === 'g') ev.ghost = true;
+    else if (m[1] === 'x') ev.any = true;
+    else {
+      ev.names = m[1].split('+').sort((a, b) => midiOf(a) - midiOf(b));
+      ev.keys = ev.names.map(midiOf);
+    }
+    measures[measures.length - 1].push(ev);
+  }
+  if (measures.length > 1 && measures[measures.length - 1].length === 0) measures.pop();
+  return measures;
+}
+
+function makeScore({ key = 'C', time = '4/4', rh = '', lh = '', staves = 'grand', title, numbers = false }) {
+  const R = rh ? parseVoice(rh) : [];
+  const L = lh ? parseVoice(lh) : [];
+  const [num, den] = time.split('/').map(Number);
+  const barBeats = num * 4 / den;
+  const n = Math.max(R.length, L.length);
+  const measures = [];
+  for (let i = 0; i < n; i++) {
+    const m = { number: i + 1, rh: R[i] || [], lh: L[i] || [] };
+    for (const hand of ['rh', 'lh']) {
+      if (!m[hand].length) m[hand] = [{ rest: true, dur: 'w', dots: 0, beats: barBeats }];
+      if (m[hand].length === 1 && m[hand][0].rest) m[hand][0].fullBar = true;
+      let pos = i * barBeats;
+      for (const ev of m[hand]) { ev.hand = hand; ev.start = pos; pos += ev.beats; }
+    }
+    measures.push(m);
+  }
+  return linkTies({ key, time, num, den, barBeats, measures, staves, title, numbers });
+}
+
+/** Point each tied note at its continuation. Re-run after slicing, which copies events. */
+function linkTies(score) {
+  for (const hand of ['rh', 'lh']) {
+    let prev = null;
+    for (const ev of score.measures.flatMap(m => m[hand])) {
+      delete ev.tieTo; delete ev.tiedFrom;
+      if (ev.ghost) continue;
+      if (prev && prev.tie && ev.keys) { prev.tieTo = ev; ev.tiedFrom = prev; }
+      prev = ev;
+    }
+  }
+  return score;
+}
+
+function sliceScore(score, from, to) {
+  const off = (from - 1) * score.barBeats;
+  const measures = score.measures.slice(from - 1, to).map(m => ({
+    number: m.number,
+    rh: m.rh.map(e => ({ ...e, start: e.start - off })),
+    lh: m.lh.map(e => ({ ...e, start: e.start - off })),
+  }));
+  return linkTies({ ...score, measures });
+}
+
+const allEvents = score => score.measures.flatMap(m => [...m.rh, ...m.lh]);
+
+/** Group note onsets into steps: everything that starts at the same beat is one step. */
+function buildSteps(score, hands = 'both') {
+  const map = new Map();
+  for (const ev of allEvents(score)) {
+    ev.inactive = hands !== 'both' && ev.hand !== hands && !ev.rest && !ev.ghost;
+    if (ev.rest || ev.ghost || ev.inactive || ev.tiedFrom) continue;
+    const k = ev.start.toFixed(4);
+    if (!map.has(k)) map.set(k, { start: ev.start, bar: Math.floor(ev.start / score.barBeats + 1e-9), events: [], expect: [] });
+    const st = map.get(k);
+    st.events.push(ev);
+    if (ev.any) st.expect.push({ any: true, hand: ev.hand, ev });
+    // Both hands can share a key at the same beat (e.g. voices crossing in a canon); it's one key press.
+    else for (const midi of ev.keys) if (!st.expect.some(e => e.midi === midi)) st.expect.push({ midi, hand: ev.hand, ev });
+  }
+  return [...map.values()].sort((a, b) => a.start - b.start);
+}
+
+function entryMatches(e, midi, ex) {
+  if (e.any) return !ex.splitHands || handOf(midi) === e.hand;
+  if (ex.matchPc) return mod(e.midi, 12) === mod(midi, 12);
+  return e.midi === midi;
+}
+
+/* =========================================================================
+   Exercise generators
+   ========================================================================= */
+const BASIC = ['q q q q', 'h q q', 'q q h', 'h h', 'q h q'];
+const EIGHTHS = ['e e q q q', 'q e e q q', 'q q e e q', 'e e e e h', 'q e e h'];
+const ENDINGS = ['w', 'h h', 'q q h'];
+const TONIC_KEY = { C: 'C', G: 'G', F: 'F', D: 'D', A: 'A' };
+const LH_OCT = { C: 3, G: 2, F: 3, D: 3 };
+
+function walk(idx) {
+  const r = Math.random();
+  const d = r < 0.55 ? pick([-1, 1]) : r < 0.8 ? pick([-2, 2]) : 0;
+  let n = idx + d;
+  if (n < 0 || n > 4) n = idx - d;
+  return clamp(n, 0, 4);
+}
+function nearest(tones, idx) {
+  let best = tones[0];
+  for (const t of tones) if (Math.abs(t - idx) < Math.abs(best - idx) || (Math.abs(t - idx) === Math.abs(best - idx) && Math.random() < 0.5)) best = t;
+  return best;
+}
+
+/** Five-finger melody as bars of {idx 0..4, dur}. */
+function melody(bars, patterns, { chordTones = null, endOn = 0, endings = ENDINGS } = {}) {
+  let idx = 0;
+  const out = [];
+  for (let b = 0; b < bars; b++) {
+    const last = b === bars - 1;
+    const pat = (last ? pick(endings) : pick(patterns)).split(' ');
+    out.push(pat.map((dur, j) => {
+      if (dur[0] === 'r') return { rest: true, dur: dur.slice(1) };
+      if (j === 0 && chordTones) idx = nearest(chordTones[b], idx);
+      else if (b > 0 || j > 0) idx = walk(idx);
+      if (last && j === pat.length - 1) idx = endOn;
+      return { idx, dur };
+    }));
+  }
+  return out;
+}
+
+function melodyTokens(mel, pos, hand, mirror = false) {
+  return mel.map(bar => bar.map(n => {
+    if (n.rest) return 'r' + n.dur;
+    const i = mirror ? 4 - n.idx : n.idx;
+    return `${pos[i]}${n.dur}:${hand === 'rh' ? i + 1 : 5 - i}`;
+  }).join(' ')).join(' | ');
+}
+
+function genReading({ pool, key = 'C', count = 12, keys }) {
+  const k = keys ? pick(keys) : key;
+  const src = typeof pool === 'function' ? pool(k) : pool;
+  const rh = [], lh = [];
+  let prev = null;
+  for (let i = 0; i < count; i++) {
+    let item;
+    do { item = pick(src); } while (src.length > 1 && item === prev);
+    prev = item;
+    const [name, staff] = item.split('@');
+    const s = staff || (midiOf(name) >= 60 ? 'rh' : 'lh');
+    (s === 'rh' ? rh : lh).push(name + 'q');
+    (s === 'rh' ? lh : rh).push('gq');
+    if (i % 4 === 3 && i < count - 1) { rh.push('|'); lh.push('|'); }
+  }
+  return { score: makeScore({ key: k, rh: rh.join(' '), lh: lh.join(' ') }), speed: true };
+}
+
+function genDyads(count = 12) {
+  const tre = scaleRun('C', 4, 12), bas = scaleRun('C', 2, 12);
+  const rh = [], lh = [];
+  for (let i = 0; i < count; i++) {
+    rh.push(pick(tre) + 'q'); lh.push(pick(bas) + 'q');
+    if (i % 4 === 3 && i < count - 1) { rh.push('|'); lh.push('|'); }
+  }
+  return { score: makeScore({ rh: rh.join(' '), lh: lh.join(' ') }), speed: true };
+}
+
+function inKeyPool(lo, hi) {
+  return k => {
+    const sc = spellScale(k);
+    const out = [];
+    for (let o = 1; o <= 6; o++) for (const pc of sc) {
+      const n = pc + o;
+      if (midiOf(n) >= midiOf(lo) && midiOf(n) <= midiOf(hi)) out.push(n);
+    }
+    return out;
+  };
+}
+
+function genOneHand({ tonic, hand, patterns = BASIC, bars = 4 }) {
+  const pos = scaleRun(tonic, hand === 'rh' ? 4 : LH_OCT[tonic], 5);
+  const voice = melodyTokens(melody(bars, patterns), pos, hand);
+  return { score: makeScore({ key: TONIC_KEY[tonic], [hand]: voice }) };
+}
+
+function genTogether(kind, { tonic = 'C', bars = 4 } = {}) {
+  const posR = scaleRun(tonic, 4, 5), posL = scaleRun(tonic, LH_OCT[tonic], 5);
+  const key = TONIC_KEY[tonic];
+  const bar = (arr) => arr.join(' | ');
+  if (kind === 'turns') {
+    const rh = [], lh = [];
+    for (let b = 0; b < bars; b++) {
+      const mel = melody(1, BASIC, { endings: b === bars - 1 ? ENDINGS : BASIC, endOn: 0 });
+      if (b % 2 === 0) { rh.push(melodyTokens(mel, posR, 'rh')); lh.push('rw'); }
+      else { lh.push(melodyTokens(mel, posL, 'lh')); rh.push('rw'); }
+    }
+    return { score: makeScore({ key, rh: bar(rh), lh: bar(lh) }) };
+  }
+  if (kind === 'hold') {
+    const mel = melody(bars, BASIC);
+    const lh = [];
+    for (let b = 0; b < bars; b++) { const i = b === bars - 1 ? 0 : pick([0, 0, 4]); lh.push(`${posL[i]}w:${5 - i}`); }
+    return { score: makeScore({ key, rh: melodyTokens(mel, posR, 'rh'), lh: bar(lh) }) };
+  }
+  if (kind === 'parallel' || kind === 'contrary') {
+    const mel = melody(bars, BASIC);
+    return { score: makeScore({ key, rh: melodyTokens(mel, posR, 'rh'), lh: melodyTokens(mel, posL, 'lh', kind === 'contrary') }) };
+  }
+  if (kind === 'fifths') {
+    const mel = melody(bars, BASIC);
+    const d = `${posL[0]}+${posL[4]}h:5,1`;
+    return { score: makeScore({ key, rh: melodyTokens(mel, posR, 'rh'), lh: bar(Array(bars).fill(`${d} ${d}`)) }) };
+  }
+  // Chord-based kinds: RH melody lands on a chord tone at the start of each bar.
+  const prog = bars === 8 ? ['I', 'IV', 'I', 'V7', 'I', 'IV', 'V7', 'I'] : ['I', 'IV', 'V7', 'I'];
+  const ch = lhProgression(tonic, LH_OCT[tonic]);
+  const tones = { I: [0, 2, 4], IV: [0, 3], V7: [1, 3, 4] };
+  const chordTones = prog.map(p => tones[p]);
+  if (kind === 'block') {
+    const mel = melody(bars, BASIC, { chordTones });
+    return { score: makeScore({ key, rh: melodyTokens(mel, posR, 'rh'), lh: bar(prog.map(p => `${ch[p].join('+')}w"${p}"`)) }) };
+  }
+  if (kind === 'broken') {
+    const mel = melody(bars, ['h h', 'w'], { chordTones, endings: ['w'] });
+    const lh = prog.map(p => {
+      const [a, b, c] = ch[p];
+      const f = p === 'I' ? [5, 1, 3, 1] : [5, 1, 2, 1];
+      const one = `${a}e:${f[0]} ${c}e:${f[1]} ${b}e:${f[2]} ${c}e:${f[3]}`;
+      return `${one} ${one.replace(/:\d/g, '')}`;
+    });
+    return { score: makeScore({ key, rh: melodyTokens(mel, posR, 'rh'), lh: bar(lh) }) };
+  }
+  if (kind === 'eighthsOver') {
+    const mel = melody(bars, EIGHTHS, { chordTones });
+    return { score: makeScore({ key, rh: melodyTokens(mel, posR, 'rh'), lh: bar(prog.map(p => `${ch[p].join('+')}h ${ch[p].join('+')}h`)) }) };
+  }
+  throw new Error('Unknown kind ' + kind);
+}
+
+function genRhythm(patterns, { time = '4/4', bars = 4 } = {}) {
+  const toks = [];
+  for (let b = 0; b < bars; b++) {
+    toks.push(pick(patterns).split(' ').map(t => (t[0] === 'r' ? t : 'x' + t)).join(' '));
+  }
+  return { score: makeScore({ time, rh: toks.join(' | '), staves: 'treble' }), anyPitch: true };
+}
+
+function genRhythmHands(bars = 4) {
+  const pairs = [
+    { rh: 're xe re xe re xe re xe', lh: 'xq xq xq xq' },
+    { rh: 'xq xq xq xq', lh: 'xh xh' },
+    { rh: 'xe xe xe xe xe xe xe xe', lh: 'xq xq xq xq' },
+    { rh: 'xq. xe xh', lh: 'xq xq xq xq' },
+    { rh: 'xh xh', lh: 'xq xq xq xq' },
+  ];
+  const rh = [], lh = [];
+  for (let b = 0; b < bars; b++) { const p = pick(pairs); rh.push(p.rh); lh.push(p.lh); }
+  return { score: makeScore({ rh: rh.join(' | '), lh: lh.join(' | ') }), anyPitch: true, splitHands: true };
+}
+
+function genIntervals(count = 8) {
+  const names = ['', 'unison', '2nd', '3rd', '4th', '5th', '6th', '7th', 'octave'];
+  const toks = [];
+  const white = scaleRun('C', 4, 5);
+  for (let i = 0; i < count; i++) {
+    const lo = pick(white);
+    const n = 2 + rand(7);
+    const li = LETTERS.indexOf(lo[0]) + n - 1;
+    const hi = LETTERS[li % 7] + (4 + Math.floor(li / 7));
+    toks.push(`${lo}+${hi}h"${names[n]}"`);
+    if (i % 2 === 1 && i < count - 1) toks.push('|');
+  }
+  return { score: makeScore({ rh: toks.join(' '), staves: 'treble' }) };
+}
+
+function genTriads({ roots, minor = false, mixed = false, inversions = false, count = 8 }) {
+  const toks = [];
+  for (let i = 0; i < count; i++) {
+    const root = pick(roots);
+    const isMin = mixed ? Math.random() < 0.5 : minor;
+    let notes = triad(root, isMin);
+    let label = root + (isMin ? 'm' : '');
+    if (inversions) {
+      const inv = rand(3);
+      notes = [...notes.slice(inv), ...notes.slice(0, inv)];
+      if (inv) label += '/' + notes[0];
+    }
+    toks.push(`${stackUp(notes, 4).join('+')}h"${pretty(label)}"`);
+    if (i % 2 === 1 && i < count - 1) toks.push('|');
+  }
+  return { score: makeScore({ rh: toks.join(' '), staves: 'treble' }) };
+}
+
+function genChordNames(count = 12) {
+  const roots = ['C', 'D', 'E', 'F', 'G', 'A', 'B', 'Bb', 'Eb', 'Ab'];
+  const toks = [];
+  for (let i = 0; i < count; i++) {
+    const root = pick(roots);
+    // A-flat minor needs C-flat, which only confuses at this stage.
+    const isMin = root !== 'Ab' && Math.random() < 0.5;
+    const label = pretty(root) + (isMin ? ' minor' : ' major');
+    toks.push(`${stackUp(triad(root, isMin), 4).join('+')}q"${label.replace(/ /g, '_')}"`);
+    if (i % 4 === 3 && i < count - 1) toks.push('|');
+  }
+  return { score: makeScore({ rh: toks.join(' '), staves: 'treble' }), display: 'label', matchPc: true };
+}
+
+function genProgression(keys) {
+  const k = pick(keys);
+  const ch = lhProgression(k, LH_OCT[k]);
+  const one = `${ch.I.join('+')}h"I" ${ch.IV.join('+')}h"IV" | ${ch.V7.join('+')}h"V7" ${ch.I.join('+')}h"I"`;
+  return { score: makeScore({ key: k, lh: `${one} | ${one}`, staves: 'bass' }) };
+}
+
+const SCALE_FINGERS = {
+  std: { rh: [1, 2, 3, 1, 2, 3, 4, 5], lh: [5, 4, 3, 2, 1, 3, 2, 1] },
+  F: { rh: [1, 2, 3, 4, 1, 2, 3, 4], lh: [5, 4, 3, 2, 1, 3, 2, 1] },
+};
+function genScale({ tonic, hands, key, minor = false, lhOct, rhOct = 4 }) {
+  const fing = SCALE_FINGERS[tonic === 'F' ? 'F' : 'std'];
+  const voice = (hand, oct) => {
+    const up = scaleRun(tonic, oct, 8, minor ? NAT_MINOR : MAJOR);
+    const f = fing[hand];
+    const tok = (i, d) => `${up[i]}${d}:${f[i]}`;
+    return [
+      [0, 1, 2, 3].map(i => tok(i, 'q')).join(' '),
+      [4, 5, 6, 7].map(i => tok(i, 'q')).join(' '),
+      [6, 5, 4, 3].map(i => tok(i, 'q')).join(' '),
+      `${tok(2, 'q')} ${tok(1, 'q')} ${tok(0, 'h')}`,
+    ].join(' | ');
+  };
+  const opts = { key: key || tonic };
+  if (hands !== 'lh') opts.rh = voice('rh', rhOct);
+  if (hands !== 'rh') opts.lh = voice('lh', lhOct);
+  return { score: makeScore(opts) };
+}
+
+/* =========================================================================
+   Technique: short fixed patterns, repeated so the fingers learn them
+   ========================================================================= */
+const RH_FIVE = [1, 2, 3, 4, 5], LH_FIVE = [5, 4, 3, 2, 1];
+
+/** One voice from bars of [scale index, finger] pairs, all eighths, ending on a whole note. */
+function eighthBars(notes, bars, end) {
+  const tok = ([i, f]) => `${notes[i]}e:${f}`;
+  return [...bars.map(b => b.map(tok).join(' ')), `${notes[end[0]]}w:${end[1]}`].join(' | ');
+}
+
+function genTechnique(kind, { hands = 'rh', tonic = 'C' } = {}) {
+  const key = TONIC_KEY[tonic];
+  const voices = {};
+  for (const hand of hands === 'both' ? ['rh', 'lh'] : [hands]) {
+    const rh = hand === 'rh';
+    const oct = rh ? 4 : LH_OCT[tonic];
+    const fing = rh ? RH_FIVE : LH_FIVE;
+    if (kind === 'five') {
+      const pos = scaleRun(tonic, oct, 5);
+      const bar = [0, 1, 2, 3, 4, 3, 2, 1].map(i => [i, fing[i]]);
+      voices[hand] = eighthBars(pos, [bar, bar, bar], [0, fing[0]]);
+    } else if (kind === 'pairs') {
+      // Fingers 1-2, 2-3, 3-4, 4-5 in turn: the weak 4-5 pair gets the same work as the strong ones.
+      const pos = scaleRun(tonic, oct, 5);
+      const bars = [0, 1, 2, 3].map(a => Array.from({ length: 8 }, (_, n) => { const i = a + n % 2; return [i, fing[i]]; }));
+      voices[hand] = eighthBars(pos, bars, [0, fing[0]]);
+    } else if (kind === 'thumb') {
+      // Right hand goes up and the left hand comes down, so the thumb always passes under finger 3.
+      const f = [1, 2, 3, 1, 2, 1, 3, 2];
+      const notes = rh ? scaleRun('C', 4, 5) : scaleRun('C', 3, 5).reverse();
+      const bar = [0, 1, 2, 3, 4, 3, 2, 1].map((i, n) => [i, f[n]]);
+      voices[hand] = eighthBars(notes, [bar, bar, bar], [0, 1]);
+    } else if (kind === 'hanon') {
+      // Hanon No. 1: up the white keys from C, then the mirrored shape back down to C.
+      const notes = scaleRun('C', oct, 14);
+      const up = [0, 2, 3, 4, 5, 4, 3, 2], upF = rh ? [1, 2, 3, 4, 5, 4, 3, 2] : [5, 4, 3, 2, 1, 2, 3, 4];
+      const downF = rh ? [5, 4, 3, 2, 1, 2, 3, 4] : [1, 2, 3, 4, 5, 4, 3, 2];
+      const bars = [0, 1, 2, 3].map(d => up.map((i, n) => [d + i, upF[n]]))
+        .concat([7, 6, 5].map(t => up.map((i, n) => [t - i, downF[n]])));
+      voices[hand] = eighthBars(notes, bars, [0, rh ? 1 : 5]);
+    } else if (kind === 'broken') {
+      // C, F, G, C, each spread over an octave: up to the top note and back.
+      const roots = rh ? ['C4', 'F4', 'G4'] : ['C3', 'F2', 'G2'];
+      const f = rh ? [1, 2, 3, 5, 3, 2, 1, 2] : [5, 3, 2, 1, 2, 3, 5, 3];
+      const bar = r => {
+        const [a, b, c] = triad(r.slice(0, -1));
+        const ns = stackUp([a, b, c, a], +r.slice(-1));
+        return [0, 1, 2, 3, 2, 1, 0, 1].map((i, n) => `${ns[i]}e:${f[n]}`).join(' ');
+      };
+      const home = stackUp(triad('C'), rh ? 4 : 3).join('+');
+      voices[hand] = [...roots.map(bar), `${home}w:${rh ? '1,3,5' : '5,3,1'}`].join(' | ');
+    } else throw new Error('Unknown kind ' + kind);
+  }
+  return { score: makeScore({ key, ...voices }) };
+}
+
+/* =========================================================================
+   Transcription: recorded notes, in beats from the first downbeat, to the score format
+   ========================================================================= */
+const NOTE_VALUES = [[4, 'w'], [3, 'h.'], [2, 'h'], [1.5, 'q.'], [1, 'q'], [0.75, 'e.'], [0.5, 'e'], [0.25, 's']];
+// Ordered by number of sharps/flats, so a tie goes to the simpler key.
+const KEY_CANDIDATES = ['C', 'G', 'F', 'D', 'Bb', 'A', 'Eb', 'E', 'Ab'];
+const FLAT_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+const EPS = 1e-6;
+
+function detectKey(midis) {
+  const counts = Array(12).fill(0);
+  for (const m of midis) counts[mod(m, 12)]++;
+  let best = 'C', bestScore = -1;
+  for (const k of KEY_CANDIDATES) {
+    const score = spellScale(k).reduce((a, n) => a + counts[mod(midiOf(n + '4'), 12)], 0);
+    if (score > bestScore) { best = k; bestScore = score; }
+  }
+  return best;
+}
+
+/** Name a MIDI note the way the key spells it; notes outside the key follow the key's sharp/flat side. */
+function spellMidi(m, key) {
+  const pc = mod(m, 12);
+  let name = spellScale(key).find(n => mod(midiOf(n + '4'), 12) === pc);
+  if (!name) name = ((KEY_COUNT[key] || 0) < 0 ? FLAT_NAMES : SHARP_NAMES)[pc];
+  const o = Math.floor(m / 12) - 1;
+  for (const oct of [o, o + 1, o - 1]) if (midiOf(name + oct) === m) return name + oct;
+  return midiName(m);
+}
+
+const onGrid = (b, step) => Math.abs(b / step - Math.round(b / step)) < EPS;
+
+/**
+ * Split a length inside one bar into written values. Rests break at every beat. Off-beat notes
+ * may cross one beat (quarter), or end on a beat (dotted quarter): the usual way to write syncopation.
+ */
+function splitValues(start, len, rest = false) {
+  const out = [];
+  while (len > EPS) {
+    const onBeat = onGrid(start, 1);
+    const toBeat = Math.floor(start + EPS) + 1 - start;
+    const ok = v => v <= len + EPS && (onBeat || v <= toBeat + EPS
+      || (!rest && (v <= 1 + EPS || (v <= 1.5 + EPS && onGrid(start + v, 1)))));
+    const hit = NOTE_VALUES.find(([v]) => ok(v)) || NOTE_VALUES[NOTE_VALUES.length - 1];
+    out.push(hit);
+    start += hit[0]; len -= hit[0];
+  }
+  return out;
+}
+
+/**
+ * raw: [{ m, on, off }] with on/off in beats from the first downbeat.
+ * grid: smallest note value in beats. split: lowest MIDI note played by the right hand.
+ */
+function transcribe(raw, { time = '4/4', grid = 0.5, key = 'auto', split = 60 } = {}) {
+  const [num, den] = time.split('/').map(Number);
+  const barBeats = num * 4 / den;
+  const q = b => Math.round(b / grid) * grid;
+  const notes = raw.filter(n => n.on > -grid).map(n => {
+    const on = Math.max(0, q(n.on));
+    return { m: n.m, on, off: Math.max(on + grid, q(n.off)) };
+  });
+  if (!notes.length) return null;
+  const k = key === 'auto' ? detectKey(notes.map(n => n.m)) : key;
+  const bars = Math.max(1, Math.ceil(Math.max(...notes.map(n => n.off)) / barBeats - EPS));
+  const total = bars * barBeats;
+
+  const voice = hand => {
+    const groups = [];
+    for (const n of notes.filter(x => (x.m < split) === (hand === 'lh')).sort((a, b) => a.on - b.on)) {
+      const g = groups[groups.length - 1];
+      if (g && Math.abs(g.on - n.on) < EPS) { if (!g.ms.includes(n.m)) g.ms.push(n.m); g.off = Math.max(g.off, n.off); }
+      else groups.push({ on: n.on, off: n.off, ms: [n.m] });
+    }
+    if (!groups.length) return '';
+    const segs = [];
+    let cur = 0;
+    groups.forEach((g, i) => {
+      const next = i + 1 < groups.length ? groups[i + 1].on : total;
+      let end = Math.min(g.off, next);
+      // Releases come early, and more so on long notes. Without this a held whole note
+      // reads as "dotted half, tied eighth, rest". Stretch to the next note or a beat nearby.
+      if (i + 1 < groups.length && next - end <= 0.5 + EPS) end = next;
+      else {
+        const toBeat = Math.min(next, Math.floor(end + Math.max(0.5, 0.35 * (end - g.on)) + EPS));
+        if (toBeat > end) end = toBeat;
+      }
+      if (g.on > cur + EPS) segs.push({ start: cur, len: g.on - cur });
+      segs.push({ start: g.on, len: end - g.on, name: g.ms.sort((a, b) => a - b).map(m => spellMidi(m, k)).join('+') });
+      cur = end;
+    });
+    if (cur < total - EPS) segs.push({ start: cur, len: total - cur });
+
+    const barToks = Array.from({ length: bars }, () => []);
+    for (const sg of segs) {
+      const pieces = [];
+      let s = sg.start, left = sg.len;
+      while (left > EPS) {
+        const bi = Math.floor(s / barBeats + EPS);
+        const inBar = Math.min(left, (bi + 1) * barBeats - s);
+        for (const [v, tok] of splitValues(s - bi * barBeats, inBar, !sg.name)) pieces.push({ bi, tok }), s += v, left -= v;
+      }
+      pieces.forEach((p, i) => barToks[p.bi].push(sg.name ? sg.name + p.tok + (i < pieces.length - 1 ? '~' : '') : 'r' + p.tok));
+    }
+    return barToks.map(b => b.join(' ')).join(' | ');
+  };
+  return { key: k, time, rh: voice('rh'), lh: voice('lh'), bars };
+}
+
+/* Ear training: each bar is one question. Nothing is drawn; the app plays the bar and you play it back. */
+function noRepeatPicks(pool, count) {
+  const out = [];
+  while (out.length < count) {
+    const n = pick(pool);
+    if (pool.length < 2 || n !== out[out.length - 1]) out.push(n);
+  }
+  return out;
+}
+const EAR = { display: 'ear', reference: [60] };
+
+function genEarNotes(pool, { count = 10, refEach = true } = {}) {
+  const rh = noRepeatPicks(pool, count).map(n => n + 'h').join(' | ');
+  return { ...EAR, refEach, score: makeScore({ rh }) };
+}
+
+function genEarMelody(len, { count = 8, pool = scaleRun('C', 4, 5), first = null } = {}) {
+  const bars = [];
+  for (let i = 0; i < count; i++) {
+    const notes = noRepeatPicks(pool, len);
+    if (first) notes[0] = first;
+    bars.push(notes.map(n => n + 'q').join(' '));
+  }
+  return { ...EAR, refEach: !first, score: makeScore({ rh: bars.join(' | ') }) };
+}
+
+function genEarChords(roots, { count = 10, minorShare = 0.5 } = {}) {
+  const bars = [];
+  for (let i = 0; i < count; i++) {
+    const root = pick(roots);
+    const isMin = root !== 'Ab' && Math.random() < minorShare;
+    bars.push(`${stackUp(triad(root, isMin), 3).join('+')}w"${pretty(root)}_${isMin ? 'minor' : 'major'}"`);
+  }
+  return { ...EAR, reference: null, matchPc: true, score: makeScore({ rh: bars.join(' | ') }) };
+}
+
+function genEarProgression(count = 10) {
+  const ch = lhProgression('C', 3);
+  const bars = [];
+  for (let i = 0; i < count; i++) { const p = pick(['I', 'IV', 'V7']); bars.push(`${ch[p].join('+')}w"${p}"`); }
+  return { ...EAR, reference: ch.I.map(midiOf), refEach: true, matchPc: true, score: makeScore({ rh: bars.join(' | ') }) };
+}
+
+/* =========================================================================
+   Pieces (public domain; left hands simplified)
+   ========================================================================= */
+const PIECES = {
+  ode: { title: 'Ode to Joy (Beethoven)', key: 'C', time: '4/4', bpm: 80,
+    rh: 'E4q:3 E4q F4q:4 G4q:5 | G4q F4q E4q D4q:2 | C4q:1 C4q D4q E4q | E4q.:3 D4e D4h | E4q E4q F4q G4q | G4q F4q E4q D4q | C4q C4q D4q E4q | D4q.:2 C4e C4h:1',
+    lh: 'C3w:5 | G3w:1 | C3w:5 | G3w:1 | C3w:5 | G3w:1 | C3w:5 | G3h:1 C3h:5' },
+  lightly: { title: 'Lightly Row (folk)', key: 'C', time: '4/4', bpm: 90,
+    rh: 'G4q:5 E4q:3 E4h | F4q:4 D4q:2 D4h | C4q:1 D4q E4q F4q | G4q:5 G4q G4h | G4q E4q E4h | F4q D4q D4h | C4q:1 E4q:3 G4q:5 G4q | C4w:1',
+    lh: 'C3w:5 | G3w:1 | C3h:5 G3h:1 | C3w:5 | C3w | G3w:1 | C3h:5 G3h:1 | C3w:5' },
+  twinkle: { title: 'Twinkle, Twinkle, Little Star (folk)', key: 'C', time: '4/4', bpm: 90,
+    rh: 'C4q:1 C4q G4q:4 G4q | A4q:5 A4q G4h:4 | F4q:4 F4q E4q:3 E4q | D4q:2 D4q C4h:1 | G4q:5 G4q F4q:4 F4q | E4q:3 E4q D4h:2 | G4q:5 G4q F4q:4 F4q | E4q:3 E4q D4h:2 | C4q:1 C4q G4q:4 G4q | A4q:5 A4q G4h:4 | F4q:4 F4q E4q:3 E4q | D4q:2 D4q C4h:1',
+    lh: 'C3w:5 | F3h:2 C3h:5 | F3h:2 C3h:5 | G3h:1 C3h:5 | C3h:5 G3h:1 | C3h G3h | C3h G3h | C3h G3h | C3w:5 | F3h:2 C3h:5 | F3h:2 C3h:5 | G3h:1 C3h:5' },
+  clair: { title: 'Au clair de la lune (folk)', key: 'C', time: '4/4', bpm: 90,
+    rh: 'C4q:1 C4q C4q D4q:2 | E4h:3 D4h:2 | C4q:1 E4q:3 D4q:2 D4q | C4w:1 | C4q C4q C4q D4q | E4h D4h | C4q E4q D4q D4q | C4w | D4q:5 D4q D4q D4q | A3h:2 A3h | D4q:5 C4q:4 B3q:3 A3q:2 | G3w:1 | C4q:1 C4q C4q D4q:2 | E4h:3 D4h:2 | C4q:1 E4q:3 D4q:2 D4q | C4w:1',
+    lh: 'C3w:5 | C3h:5 G3h:1 | C3h G3h | C3w | C3w | C3h G3h | C3h G3h | C3w | G2w:5 | D3w:1 | G2w:5 | G2w | C3w:5 | C3h G3h:1 | C3h G3h | C3w' },
+  jingle: { title: 'Jingle Bells, chorus (Pierpont)', key: 'C', time: '4/4', bpm: 100,
+    rh: 'E4q:3 E4q E4h | E4q E4q E4h | E4q G4q:5 C4q.:1 D4e:2 | E4w:3 | F4q:4 F4q F4q. F4e | F4q E4q:3 E4q E4e E4e | E4q D4q:2 D4q E4q:3 | D4h:2 G4h:5 | E4q:3 E4q E4h | E4q E4q E4h | E4q G4q:5 C4q.:1 D4e:2 | E4w:3 | F4q:4 F4q F4q. F4e | F4q E4q:3 E4q E4e E4e | G4q:5 G4q F4q:4 D4q:2 | C4w:1',
+    lh: 'C3w:5 | C3w | C3w | C3w | F3w:2 | C3w:5 | G3w:1 | G3w | C3w:5 | C3w | C3w | C3w | F3w:2 | C3w:5 | G3h:1 G3h | C3w:5' },
+  frere: { title: 'Frère Jacques, as a canon (folk)', key: 'C', time: '4/4', bpm: 90,
+    rh: 'C4q:1 D4q:2 E4q:3 C4q:1 | C4q D4q E4q C4q | E4q:3 F4q:4 G4h:5 | E4q F4q G4h | G4e A4e G4e F4e E4q C4q | G4e A4e G4e F4e E4q C4q | C4q G3q C4h | C4q G3q C4h | rw | rw',
+    lh: 'rw | rw | C3q:5 D3q:4 E3q:3 C3q:5 | C3q D3q E3q C3q | E3q:3 F3q:2 G3h:1 | E3q F3q G3h | G3e A3e G3e F3e E3q C3q | G3e A3e G3e F3e E3q C3q | C3q G2q C3h | C3q G2q C3h' },
+  minuet: { title: 'Minuet in G (Petzold), simplified LH', key: 'G', time: '3/4', bpm: 80,
+    rh: 'D5q:5 G4e:1 A4e:2 B4e:3 C5e:4 | D5q:5 G4q:1 G4q | E5q C5e D5e E5e F#5e | G5q G4q G4q | C5q D5e C5e B4e A4e | B4q C5e B4e A4e G4e | F#4q G4e A4e B4e G4e | A4h. | D5q G4e A4e B4e C5e | D5q G4q G4q | E5q C5e D5e E5e F#5e | G5q G4q G4q | C5q D5e C5e B4e A4e | B4q C5e B4e A4e G4e | A4q B4e A4e G4e F#4e | G4h.',
+    lh: 'G3h. | B3h. | C4h. | B3h. | A3h. | G3h. | D3h. | D3h. | G3h. | B3h. | C4h. | B3h. | A3h. | G3h. | D3h. | G2h.' },
+};
+const pieceLevel = (id, desc) => ({ id, name: PIECES[id].title, desc, bpm: PIECES[id].bpm, piece: true,
+  gen: () => ({ score: makeScore({ ...PIECES[id], numbers: true }) }) });
+
+/* =========================================================================
+   Theory cards
+   ========================================================================= */
+const THEORY = {
+  ear: { title: 'Training your ear', html: `
+    <p>Few people have perfect pitch, but everyone can learn <b>relative pitch</b>: hearing a note in relation to one you know. That is why the app plays a reference C first.</p>
+    <ul><li><b>Sing or hum</b> the note before you look for it. If you can sing it, you can find it.</li>
+    <li>Ask: is it higher or lower than C? Near or far? Each note of the scale has its own feel: E sounds settled, B pulls up to C.</li>
+    <li>Guess freely. A wrong key costs nothing and teaches you what that note sounds like. After three misses, the keyboard shows the answer.</li></ul>` },
+  earChords: { title: 'Hearing chords', html: `
+    <p><b>Major</b> chords sound bright and settled. <b>Minor</b> chords sound darker or sadder. Only the middle note differs, by one half step.</p>
+    <p>Find the lowest note (the root) first. Then try the major chord on it. If that sounds wrong, lower the middle note.</p>
+    <p>In a key, <b>I</b> feels like home, <b>IV</b> like moving away, and <b>V7</b> like tension that wants to go back to I.</p>` },
+  staff: { title: 'The grand staff', html: `
+    <p>Piano music uses two staves joined by a brace. The <b>treble clef</b> (top) is usually the right hand. The <b>bass clef</b> (bottom) is usually the left hand.</p>
+    <p><b>Middle C</b> (C4) sits on a short ledger line between the staves. It is the C nearest the middle of the keyboard.</p>
+    <ul><li>Treble lines, bottom to top: E G B D F. Spaces: F A C E.</li>
+    <li>Bass lines, bottom to top: G B D F A. Spaces: A C E G.</li></ul>
+    <p>Learn a few landmark notes (treble G on line 2, middle C, bass F on line 4). Read other notes as steps (line to space) or skips (line to line) from a landmark. Speed comes from recognising patterns, not counting.</p>` },
+  ledger: { title: 'Ledger lines', html: `
+    <p>Short <b>ledger lines</b> extend the staff up or down. Middle C is one ledger line below the treble staff <i>and</i> one above the bass staff: the same key, written in two places.</p>
+    <p>Just below the treble staff: D4 (space under the bottom line), C4 (1 ledger line), B3, A3 (2 lines). Above the treble staff: G5 (space), A5 (1 line), B5, C6 (2 lines).</p>` },
+  accidentals: { title: 'Sharps, flats and naturals', html: `
+    <p>A <b>sharp ♯</b> raises a note by one half step (the very next key to the right, often black). A <b>flat ♭</b> lowers it one half step. A <b>natural ♮</b> cancels a sharp or flat.</p>
+    <p>An accidental lasts until the end of the bar, for that line or space only. The next bar starts fresh.</p>
+    <p>E♯ is F, and C♭ is B: not every sharp or flat is a black key.</p>` },
+  keysig: { title: 'Key signatures', html: `
+    <p>A <b>key signature</b> at the start of each line lists the sharps or flats that apply to every such note, in every octave, for the whole piece.</p>
+    <ul><li>Sharps always come in the order F C G D A E B. The key is a half step above the last sharp. G major: F♯. D major: F♯ C♯. A major: F♯ C♯ G♯.</li>
+    <li>Flats always come in the order B E A D G C F. The key is the second-last flat. F major has one flat (B♭). B♭ major: B♭ E♭. E♭ major: B♭ E♭ A♭.</li></ul>
+    <p>Before you play, say the key signature out loud, for example "F sharp, C sharp".</p>` },
+  fingers: { title: 'Finger numbers and five-finger positions', html: `
+    <p>Both hands number fingers from the thumb: <b>1</b> thumb, 2 index, 3 middle, 4 ring, <b>5</b> little finger.</p>
+    <p>A <b>five-finger position</b> puts one finger on each of five neighbouring white keys (plus black keys the key needs). In C position the right thumb is on middle C. The left little finger is on the C an octave lower, so the left thumb is on G.</p>
+    <p>Keep your fingers curved and your wrist level. Look at the music, not your hands. The position does the finding for you.</p>` },
+  rhythm: { title: 'Note values and counting', html: `
+    <p>In 4/4 time there are four quarter-note beats per bar. Count out loud: "1 2 3 4".</p>
+    <ul><li>Whole note = 4 beats, half note = 2, quarter = 1, eighth = ½ (count "1 & 2 &").</li>
+    <li>A <b>dot</b> adds half the value again: a dotted quarter is 1½ beats, usually followed by an eighth.</li>
+    <li>Rests are silences of the same lengths. Keep counting through them.</li></ul>
+    <p>In 3/4 time there are three beats per bar (a waltz or minuet).</p>` },
+  together: { title: 'Playing hands together', html: `
+    <p>The brain learns two hands by building one combined pattern, not by splitting attention. So:</p>
+    <ul><li>Go <b>slow</b> enough to play without stopping. Wait mode is your friend.</li>
+    <li>Read <b>vertically</b>: at each beat, look at what both hands play together.</li>
+    <li>The left hand often holds or repeats. Let it be the anchor and let the right hand move.</li>
+    <li>If one spot keeps failing, loop just that bar.</li></ul>` },
+  intervals: { title: 'Intervals', html: `
+    <p>An <b>interval</b> is the distance between two notes, counted by letter names including both ends. C to E is a 3rd (C D E). C to G is a 5th.</p>
+    <p>On the staff: 2nds are line-to-space neighbours. 3rds are line-to-line (or space-to-space). 5ths skip two lines. You can see the shape without naming each note.</p>` },
+  triads: { title: 'Triads', html: `
+    <p>A <b>triad</b> is three notes stacked in 3rds: root, 3rd and 5th. In root position it looks like a snowman: line-line-line or space-space-space.</p>
+    <ul><li><b>Major</b>: root + 4 half steps + 3 half steps (C E G). Sounds bright.</li>
+    <li><b>Minor</b>: root + 3 half steps + 4 half steps (C E♭ G). Sounds darker.</li></ul>
+    <p>Use fingers 1-3-5 (right hand) or 5-3-1 (left hand).</p>` },
+  inversions: { title: 'Inversions', html: `
+    <p>An inversion uses the same three notes with a different one at the bottom. C major: C-E-G (root position), E-G-C (1st inversion), G-C-E (2nd inversion).</p>
+    <p>A chord symbol like C/E means "C major with E in the bass". Inversions let the hand move less between chords.</p>` },
+  progression: { title: 'I – IV – V', html: `
+    <p>Chords are numbered by the scale note they are built on. In C major: I = C, IV = F, V = G. Most folk and pop songs can be played with these three.</p>
+    <p>Beginner left-hand positions keep the thumb almost still: I = C-E-G, IV = C-F-A, V7 = B-F-G. Only one or two fingers move.</p>
+    <p>The <b>circle of fifths</b> (C G D A E B, and C F B♭ E♭ A♭) orders keys by how many sharps or flats they have. Neighbours share most of their notes.</p>` },
+  technique: { title: 'Technique exercises', html: `
+    <p>These patterns train the fingers, not the eyes. The same bar repeats so you can stop reading and listen to how even it sounds.</p>
+    <ul><li><b>Slow and even</b> beats fast and bumpy. Every note equally loud, every gap equally long.</li>
+    <li>Keep your fingers curved and your wrist loose. If your hand gets tense, stop and shake it out.</li>
+    <li>Start in <b>Wait for me</b> to learn the notes, then use <b>In tempo</b>. Raise the tempo by 5 only when it feels easy.</li></ul>` },
+  hanon: { title: 'Hanon No. 1', html: `
+    <p>Charles-Louis Hanon wrote these exercises in 1873 and pianists still use them. The same eight-note shape climbs one white key per bar, then comes back down.</p>
+    <p>Your hand keeps its shape and shifts as a unit. Fingers 4 and 5 are the weakest; listen for them.</p>` },
+  scales: { title: 'Scales', html: `
+    <p>A major scale follows the pattern whole-whole-half-whole-whole-whole-half steps. On C that uses only white keys.</p>
+    <p>Right hand C, G, D, A and E major: 1 2 3, <b>thumb under</b> to 1 2 3 4 5. Left hand going up: 5 4 3 2 1, <b>finger 3 crosses over</b>, 3 2 1. Going down reverses it. F major right hand is 1 2 3 4, 1 2 3 4, because of the B♭.</p>
+    <p>Pass the thumb smoothly without moving your elbow. Speed comes later.</p>` },
+};
+
+/* =========================================================================
+   Tracks and levels
+   ========================================================================= */
+const TREBLE_ALL = scaleRun('C', 4, 13);
+const TRACKS = [
+  { id: 'reading', name: 'Note reading', desc: 'Read a note, play it. Builds reading speed.', levels: [
+    { id: 't1', name: 'Treble: C to G', theory: 'staff', gen: () => genReading({ pool: scaleRun('C', 4, 5) }) },
+    { id: 't2', name: 'Treble: middle C to C5', theory: 'staff', gen: () => genReading({ pool: scaleRun('C', 4, 8) }) },
+    { id: 't3', name: 'Treble: the whole staff', gen: () => genReading({ pool: TREBLE_ALL }) },
+    { id: 'b1', name: 'Bass: C to G', gen: () => genReading({ pool: scaleRun('C', 3, 5) }) },
+    { id: 'b2', name: 'Bass: the whole staff', gen: () => genReading({ pool: scaleRun('C', 2, 15).filter(n => midiOf(n) >= midiOf('E2')).map(n => n + '@lh') }) },
+    { id: 'g1', name: 'Grand staff: C3 to C5', gen: () => genReading({ pool: scaleRun('C', 3, 15) }) },
+    { id: 'l1', name: 'Ledger lines', theory: 'ledger', gen: () => genReading({ pool: ['A3@rh', 'B3@rh', 'C4@rh', 'C4@lh', 'D4@lh', 'E4@lh', 'A5@rh', 'B5@rh', 'C6@rh', 'C2@lh', 'D2@lh', 'E2@lh'] }) },
+    { id: 'a1', name: 'Sharps and flats', theory: 'accidentals', gen: () => genReading({ pool: [...scaleRun('C', 3, 15), 'F#3', 'Bb3', 'C#4', 'Eb4', 'F#4', 'G#4', 'Bb4', 'Db4', 'Ab4', 'Eb3'] }) },
+    { id: 'k1', name: 'Key signatures: G, D, F', theory: 'keysig', gen: () => genReading({ keys: ['G', 'D', 'F'], pool: inKeyPool('C3', 'C5') }) },
+    { id: 'k2', name: 'Key signatures: B♭, A, E♭', theory: 'keysig', gen: () => genReading({ keys: ['Bb', 'A', 'Eb'], pool: inKeyPool('C3', 'C5') }) },
+    { id: 'd1', name: 'Both staves at once', gen: () => genDyads() },
+  ] },
+  { id: 'hands', name: 'One hand at a time', desc: 'Short melodies in five-finger positions.', levels: [
+    { id: 'rc', name: 'Right hand, C position', theory: 'fingers', gen: () => genOneHand({ tonic: 'C', hand: 'rh' }) },
+    { id: 'lc', name: 'Left hand, C position', theory: 'fingers', gen: () => genOneHand({ tonic: 'C', hand: 'lh' }) },
+    { id: 'rg', name: 'Right hand, G position', gen: () => genOneHand({ tonic: 'G', hand: 'rh' }) },
+    { id: 'lg', name: 'Left hand, G position', gen: () => genOneHand({ tonic: 'G', hand: 'lh' }) },
+    { id: 're', name: 'Right hand with eighth notes', theory: 'rhythm', gen: () => genOneHand({ tonic: 'C', hand: 'rh', patterns: EIGHTHS }) },
+    { id: 'le', name: 'Left hand with eighth notes', gen: () => genOneHand({ tonic: 'C', hand: 'lh', patterns: EIGHTHS }) },
+    { id: 'rf', name: 'Right hand, F position (B♭)', theory: 'keysig', gen: () => genOneHand({ tonic: 'F', hand: 'rh' }) },
+    { id: 'lf', name: 'Left hand, F position (B♭)', gen: () => genOneHand({ tonic: 'F', hand: 'lh' }) },
+    { id: 'rd', name: 'Right hand, D position (F♯)', gen: () => genOneHand({ tonic: 'D', hand: 'rh' }) },
+    { id: 'ld', name: 'Left hand, D position (F♯)', gen: () => genOneHand({ tonic: 'D', hand: 'lh' }) },
+  ] },
+  { id: 'together', name: 'Hands together', desc: 'The core skill, one small step at a time.', levels: [
+    { id: 'turns', name: 'Take turns: right bar, left bar', theory: 'together', gen: () => genTogether('turns') },
+    { id: 'hold', name: 'Left hand holds, right hand moves', theory: 'together', gen: () => genTogether('hold') },
+    { id: 'para', name: 'Parallel motion', gen: () => genTogether('parallel') },
+    { id: 'contra', name: 'Contrary motion (mirror)', gen: () => genTogether('contrary') },
+    { id: 'fifth', name: 'Left-hand root and fifth, C or G', gen: () => genTogether('fifths', { tonic: pick(['C', 'G']) }) },
+    { id: 'block', name: 'Left-hand chords I–IV–V7–I', theory: 'progression', gen: () => genTogether('block') },
+    { id: 'broken', name: 'Broken-chord left hand', gen: () => genTogether('broken') },
+    { id: 'blockk', name: 'Chords in G, F and D', gen: () => genTogether('block', { tonic: pick(['G', 'F', 'D']), bars: 8 }) },
+    { id: 'eighth', name: 'Eighth-note melody over chords', gen: () => genTogether('eighthsOver', { tonic: pick(['C', 'G']), bars: 8 }) },
+  ] },
+  { id: 'rhythm', name: 'Rhythm', desc: 'Tap any key in time with the click. Space bar works too.', levels: [
+    { id: 'r1', name: 'Quarters and halves', theory: 'rhythm', bpm: 70, modes: ['tempo'], gen: () => genRhythm(BASIC) },
+    { id: 'r2', name: 'Wholes and rests', bpm: 70, modes: ['tempo'], gen: () => genRhythm(['w', 'q rq q q', 'h rq q', 'rq q h', 'q q rh', 'h h']) },
+    { id: 'r3', name: 'Eighth notes', bpm: 65, modes: ['tempo'], gen: () => genRhythm(EIGHTHS.concat(['e e e e e e e e'])) },
+    { id: 'r4', name: 'Dotted quarters', bpm: 65, modes: ['tempo'], gen: () => genRhythm(['q. e q q', 'q. e h', 'h q. e', 'q q q. e']) },
+    { id: 'r5', name: 'Off-beats and syncopation', bpm: 60, modes: ['tempo'], gen: () => genRhythm(['q re e q q', 're e re e h', 'e q e h', 'q e q e q', 'e q e q q']) },
+    { id: 'r6', name: '3/4 time', bpm: 75, modes: ['tempo'], gen: () => genRhythm(['q q q', 'h q', 'h.', 'q h', 'e e q q', 'q. e q'], { time: '3/4' }) },
+    { id: 'r7', name: 'Two hands: different rhythms', theory: 'together', bpm: 60, modes: ['tempo'], gen: () => genRhythmHands(),
+      desc: 'Left hand plays below middle C, right hand above. Keyboard: V = left, Space = right.' },
+  ] },
+  { id: 'chords', name: 'Chords & theory', desc: 'Intervals, triads, inversions and I–IV–V.', levels: [
+    { id: 'int', name: 'Intervals', theory: 'intervals', gen: () => genIntervals() },
+    { id: 'maj1', name: 'Major triads: C, F, G', theory: 'triads', gen: () => genTriads({ roots: ['C', 'F', 'G'] }) },
+    { id: 'maj2', name: 'Major triads on every white key', gen: () => genTriads({ roots: LETTERS }) },
+    { id: 'min', name: 'Minor triads', gen: () => genTriads({ roots: ['A', 'D', 'E', 'C', 'F', 'G'], minor: true }) },
+    { id: 'name', name: 'Play a chord from its name', desc: 'Any octave, any inversion.', gen: () => genChordNames() },
+    { id: 'inv', name: 'Inversions', theory: 'inversions', gen: () => genTriads({ roots: ['C', 'F', 'G'], inversions: true }) },
+    { id: 'prog1', name: 'I–IV–V7–I in C and G (left hand)', theory: 'progression', gen: () => genProgression(['C', 'G']) },
+    { id: 'prog2', name: 'I–IV–V7–I in F and D (left hand)', gen: () => genProgression(['F', 'D']) },
+  ] },
+  { id: 'technique', name: 'Technique', desc: 'Short finger patterns, repeated. A good warm-up.', fixed: true, levels: [
+    { id: 'fr', name: 'Five-finger pattern, right hand', theory: 'technique', bpm: 60, gen: () => genTechnique('five', { hands: 'rh' }) },
+    { id: 'fl', name: 'Five-finger pattern, left hand', theory: 'technique', bpm: 60, gen: () => genTechnique('five', { hands: 'lh' }) },
+    { id: 'fb', name: 'Five-finger pattern, hands together', bpm: 55, gen: () => genTechnique('five', { hands: 'both' }) },
+    { id: 'pr', name: 'Finger pairs, right hand', bpm: 55, gen: () => genTechnique('pairs', { hands: 'rh' }) },
+    { id: 'pl', name: 'Finger pairs, left hand', bpm: 55, gen: () => genTechnique('pairs', { hands: 'lh' }) },
+    { id: 'fk', name: 'Five-finger pattern in G, F or D', fixed: false, bpm: 55, gen: () => genTechnique('five', { hands: 'both', tonic: pick(['G', 'F', 'D']) }) },
+    { id: 'tr', name: 'Thumb under, right hand', theory: 'scales', bpm: 55, gen: () => genTechnique('thumb', { hands: 'rh' }) },
+    { id: 'tl', name: 'Thumb under, left hand', bpm: 55, gen: () => genTechnique('thumb', { hands: 'lh' }) },
+    { id: 'hr', name: 'Hanon No. 1, right hand', theory: 'hanon', bpm: 55, gen: () => genTechnique('hanon', { hands: 'rh' }) },
+    { id: 'hl', name: 'Hanon No. 1, left hand', theory: 'hanon', bpm: 55, gen: () => genTechnique('hanon', { hands: 'lh' }) },
+    { id: 'hb', name: 'Hanon No. 1, hands together', bpm: 50, gen: () => genTechnique('hanon', { hands: 'both' }) },
+    { id: 'br', name: 'Broken chords, right hand', theory: 'triads', bpm: 55, gen: () => genTechnique('broken', { hands: 'rh' }) },
+    { id: 'bl', name: 'Broken chords, left hand', bpm: 55, gen: () => genTechnique('broken', { hands: 'lh' }) },
+  ] },
+  { id: 'scales', name: 'Scales', desc: 'One octave up and down, with fingering.', fixed: true, levels: [
+    { id: 'cr', name: 'C major, right hand', theory: 'scales', bpm: 60, gen: () => genScale({ tonic: 'C', hands: 'rh' }) },
+    { id: 'cl', name: 'C major, left hand', theory: 'scales', bpm: 60, gen: () => genScale({ tonic: 'C', hands: 'lh', lhOct: 3 }) },
+    { id: 'cb', name: 'C major, hands together', bpm: 50, gen: () => genScale({ tonic: 'C', hands: 'both', lhOct: 3 }) },
+    { id: 'gr', name: 'G major, right hand', bpm: 60, gen: () => genScale({ tonic: 'G', hands: 'rh' }) },
+    { id: 'gl', name: 'G major, left hand', bpm: 60, gen: () => genScale({ tonic: 'G', hands: 'lh', lhOct: 2 }) },
+    { id: 'gb', name: 'G major, hands together', bpm: 50, gen: () => genScale({ tonic: 'G', hands: 'both', lhOct: 2 }) },
+    { id: 'fr', name: 'F major, right hand', bpm: 60, gen: () => genScale({ tonic: 'F', hands: 'rh' }) },
+    { id: 'fl', name: 'F major, left hand', bpm: 60, gen: () => genScale({ tonic: 'F', hands: 'lh', lhOct: 2 }) },
+    { id: 'fb', name: 'F major, hands together', bpm: 50, gen: () => genScale({ tonic: 'F', hands: 'both', lhOct: 2 }) },
+    { id: 'db', name: 'D major, hands together', bpm: 50, gen: () => genScale({ tonic: 'D', hands: 'both', lhOct: 3 }) },
+    { id: 'ab', name: 'A minor (natural), hands together', bpm: 50, gen: () => genScale({ tonic: 'A', hands: 'both', key: 'Am', minor: true, lhOct: 2 }) },
+  ] },
+  { id: 'ear', name: 'Ear training', desc: 'The app plays; you play back what you heard. No music shown.', levels: [
+    { id: 'n1', name: 'Notes C to G', theory: 'ear', modes: ['wait'], bpm: 90, gen: () => genEarNotes(scaleRun('C', 4, 5)) },
+    { id: 'n2', name: 'The C major scale, C4 to C5', theory: 'ear', modes: ['wait'], bpm: 90, gen: () => genEarNotes(scaleRun('C', 4, 8)) },
+    { id: 'n3', name: 'From C to another note', modes: ['wait'], bpm: 90, desc: 'You hear C, then a second note. Play both.', gen: () => genEarMelody(2, { first: 'C4', pool: scaleRun('C', 4, 8).slice(1) }) },
+    { id: 'm2', name: 'Two-note melodies', modes: ['wait'], bpm: 90, gen: () => genEarMelody(2) },
+    { id: 'm3', name: 'Three-note melodies', modes: ['wait'], bpm: 90, gen: () => genEarMelody(3) },
+    { id: 'n4', name: 'Black keys too', modes: ['wait'], bpm: 90, gen: () => genEarNotes(Array.from({ length: 13 }, (_, i) => midiName(60 + i))) },
+    { id: 'm4', name: 'Four-note melodies, C major scale', modes: ['wait'], bpm: 90, gen: () => genEarMelody(4, { pool: scaleRun('C', 4, 8) }) },
+    { id: 'c1', name: 'Chords: C major or C minor?', theory: 'earChords', modes: ['wait'], desc: 'Any octave, any inversion.', gen: () => genEarChords(['C']) },
+    { id: 'c2', name: 'Major or minor, white-key roots', theory: 'earChords', modes: ['wait'], desc: 'The lowest note is the root.', gen: () => genEarChords(LETTERS) },
+    { id: 'c3', name: 'I, IV or V7 in C', theory: 'earChords', modes: ['wait'], desc: 'You hear the C major chord first as home.', gen: () => genEarProgression() },
+    { id: 'c4', name: 'Major or minor, any root', modes: ['wait'], gen: () => genEarChords(['C', 'D', 'E', 'F', 'G', 'A', 'B', 'Bb', 'Eb', 'Ab', 'F#', 'Db']) },
+  ] },
+  { id: 'pieces', name: 'Pieces', desc: 'Real tunes for two hands. Loop bars and practise one hand at a time.', levels: [
+    pieceLevel('ode', 'Right hand in C position; left hand changes between C and G.'),
+    pieceLevel('lightly', 'Same position, a few more changes.'),
+    pieceLevel('twinkle', 'The right hand stretches to A; left-hand chords change mid-bar.'),
+    pieceLevel('clair', 'The middle section moves the right hand down below middle C.'),
+    pieceLevel('jingle', 'Dotted rhythms and eighth notes.'),
+    pieceLevel('frere', 'A canon: the left hand plays the same tune two bars later.'),
+    pieceLevel('minuet', 'Key of G in 3/4, with lots of eighth notes. A real milestone.'),
+  ] },
+];
+TRACKS.push({ id: 'mine', name: 'My recordings', desc: 'Pieces you recorded. Loop bars and practise one hand at a time.', free: true, levels: [] });
+const TRACK_BY_ID = Object.fromEntries(TRACKS.map(t => [t.id, t]));
+
+/* =========================================================================
+   Storage
+   ========================================================================= */
+const STORE_KEY = 'piano-trainer.v1';
+const DEFAULT_SETTINGS = {
+  midiIn: 'all', midiOut: 'auto', demoSound: 'piano', qwerty: true, showFingers: true, showNames: false, showKeys: true,
+  hints: 'after-error', keySound: true, recBpm: 80, recTime: '4/4', recGrid: 0.5, recKey: 'auto', recSplit: 'C4', recClick: true, echoBpm: 90, echoReference: true, echoRhythm: false, pianoVol: 0.8, pianoVolMethod: 'sysex', appVol: 0.8, metroVol: 0.5, latencyMs: 0, goodMs: 100, okMs: 200,
+};
+let settings = { ...DEFAULT_SETTINGS };
+const Store = {
+  data: null,
+  load() {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) { /* first run or blocked storage */ }
+    this.data = Object.assign({ version: 1, settings: {}, levels: {}, days: {}, theorySeen: {}, recordings: [] }, d || {});
+    settings = { ...DEFAULT_SETTINGS, ...this.data.settings };
+    refreshMine();
+  },
+  save() {
+    this.data.settings = settings;
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(this.data)); } catch (e) { toast('Could not save progress: ' + e.message); }
+  },
+  level(key) { return this.data.levels[key] || { attempts: 0, passes: 0 }; },
+  record(key, res, secs) {
+    const r = this.data.levels[key] = this.level(key);
+    r.attempts++;
+    if (res.pass) r.passes++;
+    r.bestAcc = Math.max(r.bestAcc || 0, res.acc);
+    if (res.speed) r.bestSpeed = Math.min(r.bestSpeed || Infinity, res.speed);
+    if (res.pass && res.mode === 'tempo') r.bestTempo = Math.max(r.bestTempo || 0, res.bpm);
+    r.last = today();
+    const d = this.data.days[today()] = this.data.days[today()] || { secs: 0, exercises: 0 };
+    d.secs += Math.min(secs, 600);
+    d.exercises++;
+    this.save();
+  },
+  streak() {
+    let n = 0;
+    const dt = new Date();
+    if (!this.data.days[today()]) dt.setDate(dt.getDate() - 1);
+    while (this.data.days[dt.toLocaleDateString('sv-SE')]) { n++; dt.setDate(dt.getDate() - 1); }
+    return n;
+  },
+};
+const levelKey = (trackId, level) => `${trackId}:${level.id}`;
+function currentLevelIdx(track) {
+  const i = track.levels.findIndex(l => Store.level(levelKey(track.id, l)).passes < 3);
+  return i === -1 ? track.levels.length - 1 : i;
+}
+const isUnlocked = (track, i) => track.free || i === 0 || Store.level(levelKey(track.id, track.levels[i - 1])).passes > 0;
+
+/* =========================================================================
+   Input: MIDI, computer keyboard, on-screen keys, microphone
+   ========================================================================= */
+const Input = {
+  listeners: new Set(), held: new Set(), pedal: false,
+  on(fn) { this.listeners.add(fn); },
+  emit(ev) { for (const fn of this.listeners) fn(ev); },
+  noteOn(midi, vel = 80, t = performance.now(), src = '') {
+    // The FP-10 makes its own sound; on-screen and computer keys need ours.
+    if ((src === 'screen' || src === 'qwerty') && settings.keySound) Sound.liveOn(midi, vel);
+    this.held.add(midi);
+    Keyboard.setDown(midi, true);
+    this.emit({ type: 'on', midi, vel, t, src });
+    updateHeld();
+  },
+  noteOff(midi, t = performance.now()) {
+    Sound.liveOff(midi);
+    if (!this.held.delete(midi)) return;
+    Keyboard.setDown(midi, false);
+    this.emit({ type: 'off', midi, t });
+    updateHeld();
+  },
+  setPedal(v) {
+    this.pedal = v;
+    const c = document.getElementById('chip-pedal');
+    c.hidden = false; c.classList.toggle('on', v); c.textContent = v ? 'Pedal down' : 'Pedal';
+  },
+};
+function updateHeld() {
+  const el = document.getElementById('kbd-held');
+  const notes = [...Input.held].sort((a, b) => a - b).map(m => pretty(midiName(m)));
+  el.textContent = notes.length ? 'Held: ' + notes.join(' ') : ' ';
+}
+
+const Midi = {
+  access: null, out: null,
+  async init() {
+    const chip = document.getElementById('chip-midi');
+    if (!navigator.requestMIDIAccess) { chip.textContent = 'MIDI: not supported (use Chrome)'; chip.className = 'chip warn'; return; }
+    try {
+      this.access = await navigator.requestMIDIAccess({ sysex: false });
+      this.access.onstatechange = () => this.refresh();
+      this.refresh();
+    } catch (e) { chip.textContent = 'MIDI: blocked'; chip.className = 'chip warn'; }
+  },
+  inputs() { return this.access ? [...this.access.inputs.values()] : []; },
+  outputs() { return this.access ? [...this.access.outputs.values()] : []; },
+  /** Piano volume, 0..1. SysEx master volume needs a separate Chrome permission, asked for on first use. */
+  async setVolume(v) {
+    if (!this.out) return;
+    if (settings.pianoVolMethod === 'cc7') {
+      this.out.send([0xb0, 7, Math.round(v * 127)]);
+      return;
+    }
+    if (!this.access.sysexEnabled) {
+      try {
+        this.access = await navigator.requestMIDIAccess({ sysex: true });
+        this.access.onstatechange = () => this.refresh();
+        this.refresh();
+      } catch (e) { toast('SysEx permission denied. Switch to "Channel volume" in Settings.'); return; }
+    }
+    const n = Math.round(v * 16383);
+    this.out.send([0xf0, 0x7f, 0x7f, 0x04, 0x01, n & 0x7f, n >> 7, 0xf7]);
+  },
+  refresh() {
+    for (const inp of this.inputs()) inp.onmidimessage = e => this.onMessage(e, inp);
+    const outs = this.outputs();
+    if (settings.midiOut === 'none') this.out = null;
+    else if (settings.midiOut !== 'auto') this.out = outs.find(o => o.id === settings.midiOut) || null;
+    else this.out = outs.find(o => /roland|fp-?\d+|piano/i.test(o.name)) || outs.find(o => !/iac|through/i.test(o.name)) || null;
+    const ins = this.inputs().filter(i => i.state === 'connected');
+    const chip = document.getElementById('chip-midi');
+    chip.textContent = ins.length ? 'MIDI: ' + ins.map(i => i.name).join(', ') : 'MIDI: no device';
+    chip.className = 'chip ' + (ins.length ? 'on' : 'warn');
+    document.getElementById('chip-vol').hidden = !this.out;
+    if (currentView === 'settings') renderView();
+  },
+  onMessage(e, inp) {
+    if (settings.midiIn !== 'all' && inp.id !== settings.midiIn) return;
+    const [st, d1, d2] = e.data;
+    const cmd = st & 0xf0;
+    const t = e.timeStamp || performance.now();
+    if (cmd === 0x90 && d2 > 0) Input.noteOn(d1, d2, t, 'midi');
+    else if (cmd === 0x80 || cmd === 0x90) Input.noteOff(d1, t);
+    else if (cmd === 0xb0 && d1 === 64) Input.setPedal(d2 >= 64);
+  },
+};
+
+// Physical key codes, so the layout works on Swedish and US keyboards alike.
+const QWERTY = { KeyA: 0, KeyW: 1, KeyS: 2, KeyE: 3, KeyD: 4, KeyF: 5, KeyT: 6, KeyG: 7, KeyY: 8, KeyH: 9,
+  KeyU: 10, KeyJ: 11, KeyK: 12, KeyO: 13, KeyL: 14, KeyP: 15, Semicolon: 16 };
+let qwertyBase = 60;
+const qwertyDown = new Map();
+function qwertyInfo() {
+  document.getElementById('kbd-qwerty').textContent = settings.qwerty
+    ? `Computer keys: A W S E D F … = ${midiName(qwertyBase)} upwards · Z/X = octave · Space/V = tap` : '';
+}
+function onKey(e, down) {
+  if (!settings.qwerty || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+  let midi = null;
+  if (e.code in QWERTY) midi = qwertyBase + QWERTY[e.code];
+  else if (e.code === 'Space') midi = 67;
+  else if (e.code === 'KeyV') midi = 48;
+  else if (down && !e.repeat && e.code === 'KeyZ') { qwertyBase = Math.max(24, qwertyBase - 12); qwertyInfo(); return; }
+  else if (down && !e.repeat && e.code === 'KeyX') { qwertyBase = Math.min(96, qwertyBase + 12); qwertyInfo(); return; }
+  if (midi == null) return;
+  e.preventDefault();
+  if (down) {
+    if (e.repeat || qwertyDown.has(e.code)) return;
+    qwertyDown.set(e.code, midi);
+    Input.noteOn(midi, 80, performance.now(), 'qwerty');
+  } else if (qwertyDown.has(e.code)) {
+    Input.noteOff(qwertyDown.get(e.code));
+    qwertyDown.delete(e.code);
+  }
+}
+
+/** YIN pitch detector: good for one note at a time, not for chords. */
+function detectPitch(buf, sr) {
+  const half = buf.length >> 1;
+  const d = new Float32Array(half);
+  const minTau = Math.floor(sr / 2200), maxTau = Math.min(half - 1, Math.floor(sr / 40));
+  for (let tau = 1; tau <= maxTau; tau++) {
+    let s = 0;
+    for (let i = 0; i < half; i++) { const x = buf[i] - buf[i + tau]; s += x * x; }
+    d[tau] = s;
+  }
+  let run = 0;
+  d[0] = 1;
+  for (let tau = 1; tau <= maxTau; tau++) { run += d[tau]; d[tau] = run ? d[tau] * tau / run : 1; }
+  for (let tau = minTau; tau < maxTau; tau++) {
+    if (d[tau] < 0.12) {
+      while (tau + 1 < maxTau && d[tau + 1] < d[tau]) tau++;
+      const a = d[tau - 1], b = d[tau], c = d[tau + 1];
+      const shift = (a - c) / (2 * (a - 2 * b + c) || 1);
+      return sr / (tau + (Number.isFinite(shift) ? shift : 0));
+    }
+  }
+  return -1;
+}
+const Mic = {
+  stream: null, analyser: null, buf: null, timer: null, current: null, cand: null, count: 0, lastRms: 0,
+  async start() {
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    } catch (e) { toast('Microphone blocked: ' + e.message); return false; }
+    const c = Sound.ctx();
+    this.analyser = c.createAnalyser();
+    this.analyser.fftSize = 2048;
+    c.createMediaStreamSource(this.stream).connect(this.analyser);
+    this.buf = new Float32Array(2048);
+    this.timer = setInterval(() => this.tick(), 20);
+    const chip = document.getElementById('chip-mic'); chip.hidden = false; chip.className = 'chip on'; chip.textContent = 'Mic on';
+    return true;
+  },
+  stop() {
+    clearInterval(this.timer);
+    if (this.stream) this.stream.getTracks().forEach(t => t.stop());
+    this.stream = null;
+    if (this.current != null) Input.noteOff(this.current);
+    this.current = null;
+    document.getElementById('chip-mic').hidden = true;
+  },
+  tick() {
+    this.analyser.getFloatTimeDomainData(this.buf);
+    let rms = 0;
+    for (const x of this.buf) rms += x * x;
+    rms = Math.sqrt(rms / this.buf.length);
+    const onset = rms > this.lastRms * 1.8 && rms > 0.02;
+    this.lastRms = rms * 0.3 + this.lastRms * 0.7;
+    if (rms < 0.01) {
+      if (this.current != null) Input.noteOff(this.current);
+      this.current = null; this.cand = null; return;
+    }
+    const f = detectPitch(this.buf, Sound.ctx().sampleRate);
+    if (f <= 0) return;
+    const midi = Math.round(69 + 12 * Math.log2(f / 440));
+    if (midi < 21 || midi > 108) return;
+    if (midi === this.cand) this.count++; else { this.cand = midi; this.count = 1; }
+    const retrigger = onset && midi === this.current;
+    if (this.count >= 3 && (midi !== this.current || retrigger)) {
+      if (this.current != null) Input.noteOff(this.current);
+      Input.noteOn(midi, 80, performance.now() - 60, 'mic');
+      this.current = midi;
+    }
+  },
+};
+
+/* =========================================================================
+   Sound out: MIDI to the piano, or a small WebAudio synth; metronome clicks
+   ========================================================================= */
+const appVel = vel => clamp(Math.round(vel * settings.appVol * 1.25), 1, 127);
+const Sound = {
+  _ctx: null, nodes: [],
+  ctx() {
+    if (!this._ctx) this._ctx = new AudioContext();
+    if (this._ctx.state === 'suspended') this._ctx.resume();
+    return this._ctx;
+  },
+  at(tPerf) { const c = this.ctx(); return Math.max(c.currentTime, c.currentTime + (tPerf - performance.now()) / 1000); },
+  click(tPerf, accent) {
+    const c = this.ctx(), t = this.at(tPerf);
+    const o = c.createOscillator(), g = c.createGain();
+    o.frequency.value = accent ? 1600 : 1000;
+    g.gain.setValueAtTime(settings.metroVol * (accent ? 0.9 : 0.5), t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    o.connect(g).connect(c.destination);
+    o.start(t); o.stop(t + 0.06);
+    this.nodes.push(o);
+  },
+  tone(midi, tPerf, durMs, vel = 80) {
+    vel = appVel(vel);
+    if (settings.demoSound === 'piano' && Midi.out) {
+      this.midiAt([0x90, midi, vel], tPerf);
+      this.midiAt([0x80, midi, 0], tPerf + durMs * 0.92);
+      return;
+    }
+    const c = this.ctx(), t = this.at(tPerf), f = 440 * 2 ** ((midi - 69) / 12);
+    const len = Math.max(0.25, durMs / 1000);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.22 * vel / 127, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0005, t + len + 0.25);
+    g.connect(c.destination);
+    for (const [type, mult, amp] of [['triangle', 1, 1], ['sine', 2, 0.35]]) {
+      const o = c.createOscillator(), og = c.createGain();
+      o.type = type; o.frequency.value = f * mult; og.gain.value = amp;
+      o.connect(og).connect(g);
+      o.start(t); o.stop(t + len + 0.3);
+      this.nodes.push(o);
+    }
+  },
+  live: new Map(),
+  liveOn(midi, vel = 80) {
+    vel = appVel(vel);
+    this.liveOff(midi);
+    if (settings.demoSound === 'piano' && Midi.out) {
+      Midi.out.send([0x90, midi, vel]);
+      this.live.set(midi, null);
+      return;
+    }
+    const c = this.ctx(), t = c.currentTime, f = 440 * 2 ** ((midi - 69) / 12);
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.22 * vel / 127, t + 0.006);
+    // Decays like a struck string even while held.
+    g.gain.exponentialRampToValueAtTime(0.02 * vel / 127, t + 2.5);
+    g.connect(c.destination);
+    const oscs = [['triangle', 1, 1], ['sine', 2, 0.35]].map(([type, mult, amp]) => {
+      const o = c.createOscillator(), og = c.createGain();
+      o.type = type; o.frequency.value = f * mult; og.gain.value = amp;
+      o.connect(og).connect(g);
+      o.start(t);
+      return o;
+    });
+    this.live.set(midi, { g, oscs });
+  },
+  liveOff(midi) {
+    if (!this.live.has(midi)) return;
+    const v = this.live.get(midi);
+    this.live.delete(midi);
+    if (!v) { if (Midi.out) Midi.out.send([0x80, midi, 0]); return; }
+    const t = this._ctx.currentTime;
+    v.g.gain.cancelScheduledValues(t);
+    v.g.gain.setValueAtTime(Math.max(v.g.gain.value, 0.0002), t);
+    v.g.gain.exponentialRampToValueAtTime(0.0001, t + 0.25);
+    for (const o of v.oscs) o.stop(t + 0.3);
+  },
+  // Chrome can't cancel MIDI messages once sent with a future timestamp (MIDIOutput.clear is
+  // unimplemented), so messages are held here and sent only ~100 ms ahead.
+  midiQueue: [], sounding: new Set(), pumpTimer: null,
+  midiAt(data, t) {
+    this.midiQueue.push({ data, t });
+    this.pump();
+    if (!this.pumpTimer) this.pumpTimer = setInterval(() => this.pump(), 25);
+  },
+  pump() {
+    const horizon = performance.now() + 100;
+    const due = this.midiQueue.filter(m => m.t <= horizon);
+    this.midiQueue = this.midiQueue.filter(m => m.t > horizon);
+    for (const { data, t } of due) {
+      if (!Midi.out) continue;
+      Midi.out.send(data, Math.max(t, performance.now()));
+      if ((data[0] & 0xf0) === 0x90) this.sounding.add(data[1]); else this.sounding.delete(data[1]);
+    }
+    if (!this.midiQueue.length) { clearInterval(this.pumpTimer); this.pumpTimer = null; }
+  },
+  stopAll() {
+    for (const n of this.nodes) { try { n.stop(); } catch (e) { /* already stopped */ } }
+    this.nodes = [];
+    this.midiQueue = [];
+    if (Midi.out) {
+      for (const m of this.sounding) Midi.out.send([0x80, m, 0]);
+      Midi.out.send([0xb0, 123, 0]);
+    }
+    this.sounding.clear();
+  },
+};
+
+/* =========================================================================
+   On-screen keyboard
+   ========================================================================= */
+// The dock is fixed and its height follows the key width, so the page padding has to follow it.
+function fitDock() {
+  const dock = document.getElementById('kbd-dock').offsetHeight;
+  document.querySelector('main').style.paddingBottom = dock + 16 + 'px';
+  // Scrolling to the piano-navigation focus must keep it clear of the fixed dock and the sticky header.
+  const root = document.documentElement.style;
+  root.scrollPaddingBottom = dock + 8 + 'px';
+  root.scrollPaddingTop = document.querySelector('header.top').offsetHeight + 8 + 'px';
+}
+function applyShowKeys() {
+  document.getElementById('kbd').hidden = !settings.showKeys;
+  document.getElementById('kbd-toggle').textContent = settings.showKeys ? 'Hide keys ▾' : 'Show keys ▴';
+  // A hidden keyboard has no width to draw from, so redraw it once it is visible again.
+  if (settings.showKeys) Keyboard.render(); else fitDock();
+  if (currentView === 'drill') drawScoreOnly();
+}
+const Keyboard = {
+  el: null, lo: 21, hi: 108, rects: {}, down: new Set(), flashes: {}, flashAt: {}, hints: {},
+  mount(el) {
+    this.el = el;
+    const screenDown = new Map();
+    el.addEventListener('pointerdown', e => {
+      const m = e.target.dataset && e.target.dataset.midi;
+      if (m == null) return;
+      Sound.ctx();
+      screenDown.set(e.pointerId, +m);
+      Input.noteOn(+m, 80, performance.now(), 'screen');
+    });
+    const up = e => { if (screenDown.has(e.pointerId)) { Input.noteOff(screenDown.get(e.pointerId)); screenDown.delete(e.pointerId); } };
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+    window.addEventListener('resize', () => this.render());
+    this.render();
+  },
+  setRange(lo, hi) {
+    lo = clamp(lo, 21, 108); hi = clamp(hi, 21, 108);
+    while (lo > 21 && mod(lo, 12) !== 0) lo--;
+    while (hi < 108 && mod(hi, 12) !== 0) hi++;
+    while (hi - lo < 24) { if (lo > 24) lo -= 12; else hi += 12; }
+    if (lo === this.lo && hi === this.hi) return;
+    this.lo = lo; this.hi = hi;
+    this.render();
+  },
+  render() {
+    if (!this.el) return;
+    const whites = [];
+    for (let m = this.lo; m <= this.hi; m++) if (!isBlack(m)) whites.push(m);
+    const W = Math.max(300, this.el.clientWidth || 800);
+    const ww = W / whites.length, wh = Math.min(150, Math.max(70, ww * 5)), bw = ww * 0.6, bh = wh * 0.62;
+    let s = `<svg viewBox="0 0 ${W} ${wh}" height="${wh}">`;
+    whites.forEach((m, i) => {
+      s += `<rect class="k w" data-midi="${m}" x="${i * ww}" y="0" width="${ww}" height="${wh}" rx="3"/>`;
+      if (mod(m, 12) === 0 && ww > 11) s += `<text class="klabel" x="${i * ww + ww / 2}" y="${wh - 6}" text-anchor="middle">${m === 60 ? '●C4' : 'C' + (m / 12 - 1)}</text>`;
+    });
+    whites.forEach((m, i) => {
+      if (m + 1 <= this.hi && isBlack(m + 1)) s += `<rect class="k b" data-midi="${m + 1}" x="${(i + 1) * ww - bw / 2}" y="0" width="${bw}" height="${bh}" rx="2"/>`;
+    });
+    this.el.innerHTML = s + '</svg>';
+    fitDock();
+    this.rects = {};
+    for (const r of this.el.querySelectorAll('rect')) this.rects[r.dataset.midi] = r;
+    for (let m = this.lo; m <= this.hi; m++) this.paint(m);
+  },
+  paint(m) {
+    const r = this.rects[m];
+    if (!r) return;
+    let cls = 'k ' + (isBlack(m) ? 'b' : 'w');
+    if (this.hints[m]) cls += ' hint-' + this.hints[m];
+    if (this.down.has(m)) cls += ' down';
+    if (this.flashes[m]) cls += ' ' + this.flashes[m];
+    r.setAttribute('class', cls);
+  },
+  setDown(m, v) {
+    if (v) this.down.add(m); else this.down.delete(m);
+    if (!v && this.flashes[m] === 'bad' && performance.now() - this.flashAt[m] >= 350) delete this.flashes[m];
+    this.paint(m);
+  },
+  /** Feedback shows for at least 350 ms; a wrong key stays red for as long as it is held. */
+  flash(m, cls) {
+    this.flashes[m] = cls; this.flashAt[m] = performance.now(); this.paint(m);
+    clearTimeout(this['t' + m]);
+    this['t' + m] = setTimeout(() => { if (cls === 'bad' && this.down.has(m)) return; delete this.flashes[m]; this.paint(m); }, 350);
+  },
+  setHints(list) {
+    const old = Object.keys(this.hints);
+    this.hints = {};
+    for (const { midi, hand } of list) this.hints[midi] = hand;
+    for (const m of old) this.paint(+m);
+    for (const m of Object.keys(this.hints)) this.paint(+m);
+  },
+};
+
+/* =========================================================================
+   Notation (VexFlow)
+   ========================================================================= */
+const COLORS = { current: '#2563eb', ok: '#16a34a', late: '#d97706', err: '#d97706', bad: '#dc2626', inactive: '#b0b0b8' };
+const vfKey = name => { const p = parsePitch(name); return `${p.letter.toLowerCase()}${p.acc}/${p.oct}`; };
+
+// The grand-staff brace is drawn ~15 px left of the staves, so they need room on the left.
+const PAD_L = 28;
+function renderScore(wrap, score, { current = new Set(), cursorEvents = [] } = {}) {
+  const VF = Vex.Flow;
+  fitScoreHeight(wrap);
+  // Keep the old drawing until the new one is in place: emptying the container first makes the
+  // page shrink for a moment, which resets both this box's and the window's scroll position.
+  const prevScroll = wrap.scrollTop;
+  const old = [...wrap.childNodes];
+  const div = h('div');
+  wrap.append(div);
+  const LW = Math.max(wrap.clientWidth || 800, 620);
+  const grand = score.staves === 'grand', hasT = score.staves !== 'bass', hasB = score.staves !== 'treble';
+  const sysH = grand ? 250 : 150;
+  const keyN = Math.abs(KEY_COUNT[score.key] || 0);
+  const header = 45 + keyN * 11;
+
+  const minW = m => {
+    const n = Math.max(m.rh.length, m.lh.length);
+    const accs = [...m.rh, ...m.lh].filter(e => e.names && e.names.some(x => /[#b]/.test(x.slice(1)))).length;
+    return 60 + n * 30 + accs * 8;
+  };
+  const lines = [];
+  let line = [], used = 0;
+  score.measures.forEach((m, i) => {
+    const w = minW(m) + (line.length ? 0 : header + (i === 0 ? 30 : 0));
+    if (line.length && (used + w > LW - PAD_L - 10 || line.length >= 4)) {
+      lines.push(line); line = []; used = 0;
+      used += minW(m) + header;
+    } else used += w;
+    line.push(i);
+  });
+  if (line.length) lines.push(line);
+
+  const LH = lines.length * sysH + 10;
+  const renderer = new VF.Renderer(div, VF.Renderer.Backends.SVG);
+  renderer.resize(LW, LH);
+  const ctx = renderer.getContext();
+  const lastIdx = score.measures.length - 1;
+  const [num, den] = [score.num, score.den];
+  const cursorRects = [];
+
+  lines.forEach((idxs, li) => {
+    const y = 5 + li * sysH;
+    const widths = idxs.map((i, j) => minW(score.measures[i]) + (j === 0 ? header + (i === 0 ? 30 : 0) : 0));
+    const total = widths.reduce((a, b) => a + b, 0);
+    const stretch = li === lines.length - 1 && total < (LW - PAD_L - 10) * 0.6 ? 1 : (LW - PAD_L - 10) / total;
+    let x = PAD_L;
+    idxs.forEach((mi, j) => {
+      const m = score.measures[mi];
+      const w = widths[j] * stretch;
+      const staves = [];
+      const mk = (clef, yy) => {
+        const s = new VF.Stave(x, yy, w);
+        if (j === 0) { s.addClef(clef).addKeySignature(score.key); if (mi === 0) s.addTimeSignature(score.time); }
+        if (mi === lastIdx) s.setEndBarType(VF.Barline.type.END);
+        if (score.numbers && clef === (hasT ? 'treble' : 'bass') && j === 0) s.setMeasure(m.number);
+        return s;
+      };
+      const sT = hasT ? mk('treble', y) : null;
+      const sB = hasB ? mk('bass', grand ? y + 110 : y) : null;
+      const pairs = [];
+      if (sT) pairs.push([sT, m.rh, 'treble']);
+      if (sB) pairs.push([sB, m.lh, 'bass']);
+      const sx = Math.max(...pairs.map(([s]) => s.getNoteStartX()));
+      for (const [s] of pairs) { s.setNoteStartX(sx); s.setContext(ctx).draw(); staves.push(s); }
+      if (grand) {
+        if (j === 0) {
+          new VF.StaveConnector(sT, sB).setType(VF.StaveConnector.type.BRACE).setContext(ctx).draw();
+          new VF.StaveConnector(sT, sB).setType(VF.StaveConnector.type.SINGLE_LEFT).setContext(ctx).draw();
+        }
+        new VF.StaveConnector(sT, sB).setType(mi === lastIdx ? VF.StaveConnector.type.BOLD_DOUBLE_RIGHT : VF.StaveConnector.type.SINGLE_RIGHT).setContext(ctx).draw();
+      }
+
+      const voices = [], beams = [];
+      for (const [stave, evs, clef] of pairs) {
+        const notes = evs.map(ev => makeNote(VF, ev, clef, score.key, current));
+        applyAccidentals(VF, evs, notes, score.key);
+        notes.forEach(n => n.setStave(stave));
+        const v = new VF.Voice({ num_beats: num, beat_value: den });
+        v.setMode(VF.Voice.Mode.SOFT);
+        v.addTickables(notes);
+        voices.push([v, stave]);
+        if (evs.some(e => (e.dur === 'e' || e.dur === 's') && !e.ghost)) {
+          try { beams.push(...VF.Beam.generateBeams(notes, { groups: VF.Beam.getDefaultBeamGroups(score.time) })); } catch (e) { /* unbeamed is still readable */ }
+        }
+      }
+      const fmt = new VF.Formatter();
+      voices.forEach(([v]) => fmt.joinVoices([v]));
+      fmt.format(voices.map(([v]) => v), Math.max(20, x + w - sx - 15));
+      voices.forEach(([v, s]) => v.draw(ctx, s));
+      beams.forEach(b => b.setContext(ctx).draw());
+
+      for (const ev of cursorEvents) {
+        if (ev._vf && [...m.rh, ...m.lh].includes(ev)) cursorRects.push({ x: ev._vf.getAbsoluteX(), y });
+      }
+      for (const ev of [...m.rh, ...m.lh]) ev._line = li;
+      x += w;
+    });
+  });
+
+  // Ties across a line break are drawn as two halves: one leaving, one arriving.
+  for (const ev of allEvents(score)) {
+    const nx = ev.tieTo;
+    if (!nx || !ev._vf || !nx._vf) continue;
+    const idx = ev.keys.map((_, i) => i);
+    const tie = ev._line === nx._line
+      ? [{ first_note: ev._vf, last_note: nx._vf, first_indices: idx, last_indices: idx }]
+      : [{ first_note: ev._vf, first_indices: idx }, { last_note: nx._vf, last_indices: idx }];
+    for (const t of tie) new VF.StaveTie(t).setContext(ctx).draw();
+  }
+  const svg = div.querySelector('svg');
+  svg.setAttribute('viewBox', `0 0 ${LW} ${LH}`);
+  svg.setAttribute('width', '100%');
+  svg.removeAttribute('height');
+  svg.style.height = 'auto';
+  old.forEach(n => n.remove());
+  if (cursorRects.length) {
+    const cx = Math.min(...cursorRects.map(r => r.x)), cy = cursorRects[0].y;
+    const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    r.setAttribute('x', cx - 7); r.setAttribute('y', cy + 25);
+    r.setAttribute('width', 26); r.setAttribute('height', sysH - 60);
+    r.setAttribute('rx', 5); r.setAttribute('fill', 'rgba(37,99,235,0.12)');
+    svg.insertBefore(r, svg.firstChild);
+    const scale = (svg.clientWidth || LW) / LW;
+    wrap.scrollTop = prevScroll;
+    // Keep the current row at the top, so the next row is already in view while you play this one.
+    const target = clamp(cy * scale - 10, 0, Math.max(0, wrap.scrollHeight - wrap.clientHeight));
+    if (Math.abs(target - wrap.scrollTop) > 4) wrap.scrollTo({ top: target, behavior: 'smooth' });
+  } else wrap.scrollTop = prevScroll;
+}
+
+/** Size the score box to the space between its top and the fixed keyboard, so the page itself never needs to scroll. */
+function fitScoreHeight(wrap) {
+  const top = wrap.getBoundingClientRect().top + window.scrollY;
+  // Use main's actual bottom padding (set from the dock height) so the page ends exactly at the window edge.
+  const pad = parseFloat(getComputedStyle(document.querySelector('main')).paddingBottom) || 0;
+  wrap.style.maxHeight = Math.max(240, Math.floor(window.innerHeight - top - pad) - 1) + 'px';
+}
+
+// Staff position (and demo pitch) for pitchless rhythm notes and rests.
+const RHYTHM_NOTE = { rh: 'B4', lh: 'D3' };
+// VexFlow accepts w/h/q as names but needs numbers for shorter notes.
+const VF_DUR = { w: 'w', h: 'h', q: 'q', e: '8', s: '16' };
+function makeNote(VF, ev, clef, key, current) {
+  const restKey = vfKey(clef === 'treble' ? RHYTHM_NOTE.rh : RHYTHM_NOTE.lh);
+  const d = VF_DUR[ev.dur] + (ev.dots ? 'd' : '');
+  let n;
+  if (ev.ghost) n = new VF.GhostNote({ duration: d });
+  else if (ev.rest) n = new VF.StaveNote({ clef, keys: [restKey], duration: (ev.fullBar ? 'w' : d) + 'r', align_center: !!ev.fullBar });
+  else n = new VF.StaveNote({ clef, keys: ev.any ? [restKey] : ev.names.map(vfKey), duration: d, auto_stem: true });
+  if (ev.dots && !ev.ghost && !ev.fullBar) VF.Dot.buildAndAttach([n], { all: true });
+  if (!ev.ghost && !ev.rest) {
+    const c = ev.inactive ? COLORS.inactive : ev.result ? COLORS[ev.result] : current.has(ev) ? COLORS.current : null;
+    if (c) n.setStyle({ fillStyle: c, strokeStyle: c });
+    const top = VF.Annotation.VerticalJustify.TOP, bottom = VF.Annotation.VerticalJustify.BOTTOM;
+    const fingerSide = clef === 'treble' ? top : bottom, otherSide = clef === 'treble' ? bottom : top;
+    if (settings.showFingers && ev.fingers && ev.fingers.length === 1) {
+      n.addModifier(new VF.Annotation(String(ev.fingers[0])).setFont('Arial', 11, 'bold').setVerticalJustification(fingerSide), 0);
+    }
+    if (ev.label) n.addModifier(new VF.Annotation(pretty(ev.label)).setFont('Arial', 12).setVerticalJustification(otherSide), 0);
+    else if (settings.showNames && ev.names) {
+      n.addModifier(new VF.Annotation(ev.names.map(x => pretty(x.replace(/\d/, ''))).join(' ')).setFont('Arial', 10).setVerticalJustification(otherSide), 0);
+    }
+  }
+  ev._vf = n;
+  return n;
+}
+
+/** Accidentals: show one only when the note differs from the key signature or an earlier accidental in the bar. */
+function applyAccidentals(VF, evs, notes, key) {
+  const sig = keyAccMap(key);
+  const state = {};
+  evs.forEach((ev, i) => {
+    if (!ev.names) return;
+    ev.names.forEach((name, k) => {
+      const p = parsePitch(name);
+      const slot = p.letter + p.oct;
+      const cur = slot in state ? state[slot] : sig[p.letter];
+      if (p.acc !== cur) {
+        notes[i].addModifier(new VF.Accidental(p.acc === '' ? 'n' : p.acc), k);
+        state[slot] = p.acc;
+      }
+    });
+  });
+}
+
+/* =========================================================================
+   Drill engine
+   ========================================================================= */
+let D = null;          // the running drill, or null
+let session = null;    // today's suggested session while working through it
+
+/** True when every generated exercise is the same, so "New exercise" would change nothing. */
+function isFixed() { return D.level.fixed ?? !!D.track.fixed; }
+function nextExerciseBtn(cls = '') {
+  return D.idx + 1 < D.track.levels.length ? h('button', { class: cls, onclick: () => openLevel(D.track.id, D.idx + 1), title: 'Piano: C1' }, 'Next exercise →') : null;
+}
+
+function openLevel(trackId, idx) {
+  echoStop();
+  stopRun();
+  const track = TRACK_BY_ID[trackId];
+  const level = track.levels[idx];
+  D = { track, level, idx, key: levelKey(trackId, level),
+    modes: level.modes || ['wait', 'tempo'], bpm: level.bpm || 70,
+    hands: 'both', from: 1, to: null, accompany: true };
+  D.mode = D.modes[0];
+  const rec = Store.level(D.key);
+  if (rec.bestTempo && D.modes.includes('tempo')) D.bpm = rec.bestTempo;
+  currentView = 'drill';
+  newExercise(true);
+}
+
+function newExercise(fresh) {
+  stopRun();
+  if (fresh || !D.base) D.base = D.level.gen();
+  const n = D.base.score.measures.length;
+  if (D.to == null || D.to > n) D.to = n;
+  D.from = clamp(D.from, 1, D.to);
+  const score = D.level.piece ? sliceScore(D.base.score, D.from, D.to) : D.base.score;
+  D.ex = { ...D.base, score };
+  resetRun();
+  renderView();
+}
+
+function resetRun() {
+  for (const ev of allEvents(D.ex.score)) delete ev.result;
+  D.steps = buildSteps(D.ex.score, D.hands);
+  D.i = 0; D.errors = 0; D.wrong = 0; D.clean = 0; D.times = [];
+  D.running = null; D.finished = null; D.startedAt = null; D.lastT = null;
+  D.earStarted = false; D.reveal = null; D.earBusyUntil = 0; clearTimeout(D.earTimer);
+  for (const s of D.steps) { s.err = false; s.errs = 0; s.done = false; for (const e of s.expect) { e.hit = false; e.dt = null; } }
+  const notes = allEvents(D.ex.score).filter(e => e.keys).flatMap(e => e.keys);
+  if (D.ex.display === 'label') Keyboard.setRange(48, 84);
+  else if (!notes.length) Keyboard.setRange(48, 72);
+  else Keyboard.setRange(Math.min(...notes) - 2, Math.max(...notes) + 2);
+  if (D.mode === 'wait') { D.running = 'wait'; }
+  updateHints();
+}
+
+function stopRun() {
+  if (!D) return;
+  cancelAnimationFrame(D.raf);
+  clearTimeout(D.earTimer);
+  Sound.stopAll();
+  D.running = null;
+  Keyboard.setHints([]);
+}
+
+function curStep() { return D && D.steps[D.i]; }
+
+function updateHints() {
+  if (!D) return Keyboard.setHints([]);
+  const st = curStep();
+  const show = D.running === 'wait' && st && (D.ex.display === 'ear'
+    ? settings.hints !== 'never' && st.errs >= 3
+    : settings.hints === 'always' || (settings.hints === 'after-error' && st.err));
+  if (!show) return Keyboard.setHints([]);
+  Keyboard.setHints(st.expect.filter(e => !e.hit && !e.any).map(e => ({ midi: D.ex.matchPc ? 60 + mod(e.midi, 12) : e.midi, hand: e.hand })));
+}
+
+// The lowest keys, far below any exercise. In Echo, A0 means "play again" and B0 "easier".
+const DRILL_KEYS = { 21: 'restart', 22: 'listen', 23: 'prev', 24: 'next' };
+
+function onInput(ev) {
+  if (Nav.handle(ev)) return;
+  const action = currentView === 'drill' && D && DRILL_KEYS[ev.midi];
+  if (action) {
+    if (ev.type !== 'on') return;
+    const to = D.idx + (action === 'next' ? 1 : -1);
+    if (action === 'restart') restartRun();
+    else if (action === 'listen') listen();
+    else if (to >= 0 && to < D.track.levels.length) openLevel(D.track.id, to);
+    return;
+  }
+  if (currentView === 'record') return recNote(ev);
+  if (currentView === 'echo' && ev.type === 'on') return echoNote(ev);
+  if (!D || currentView !== 'drill' || ev.type !== 'on') return;
+  if (D.running === 'wait') waitNote(ev);
+  else if (D.running === 'tempo') tempoNote(ev);
+}
+
+function earPlay(withRef) {
+  const st = curStep();
+  if (!st) return;
+  const first = !D.earStarted;
+  D.earStarted = true;
+  const mpb = 60000 / D.bpm;
+  let t = performance.now() + 150;
+  if (withRef && D.ex.reference) {
+    for (const m of D.ex.reference) Sound.tone(m, t, 800);
+    t += 1200;
+  }
+  const bar = D.steps.filter(s => s.bar === st.bar).flatMap(s => s.events);
+  const base = st.bar * D.ex.score.barBeats;
+  let end = t;
+  for (const ev of bar) {
+    const at = t + (ev.start - base) * mpb, len = ev.beats * mpb * 0.9;
+    for (const m of ev.keys) Sound.tone(m, at, len);
+    end = Math.max(end, at + len);
+  }
+  // Ignore keys while the question plays, so playing along (or the mic hearing it) doesn't count.
+  D.earBusyUntil = end - 100;
+  if (first) renderView(); else drawDrill();
+}
+
+function earReveal(bar) {
+  const steps = D.steps.filter(s => s.bar === bar);
+  const evs = steps.flatMap(s => s.events);
+  const text = evs.some(e => e.label) ? evs.map(e => e.label).join(' → ') : evs.map(e => pretty(e.names.join(' '))).join('  ');
+  D.reveal = { text, ok: steps.every(s => !s.err) };
+}
+
+function waitNote(ev) {
+  const st = curStep();
+  if (!st) return;
+  // Arrival time, not ev.t: Bluetooth MIDI timestamps can lag real time.
+  if (D.ex.display === 'ear' && (!D.earStarted || performance.now() < D.earBusyUntil)) return;
+  if (D.startedAt == null) { D.startedAt = ev.t; D.lastT = ev.t; }
+  const e = st.expect.find(x => !x.hit && entryMatches(x, ev.midi, D.ex));
+  if (e) {
+    e.hit = true;
+    Keyboard.flash(ev.midi, 'good');
+    if (st.expect.every(x => x.hit)) {
+      st.done = true;
+      if (!st.err) D.clean++;
+      for (const x of st.events) x.result = st.err ? 'err' : 'ok';
+      D.times.push(ev.t - D.lastT);
+      D.lastT = ev.t;
+      D.i++;
+      if (D.ex.display === 'ear' && (D.i >= D.steps.length || D.steps[D.i].bar !== st.bar)) {
+        earReveal(st.bar);
+        if (D.i < D.steps.length) {
+          D.earBusyUntil = Infinity;
+          D.earTimer = setTimeout(() => earPlay(D.ex.refEach), 1100);
+        }
+      }
+      if (D.i >= D.steps.length) return finishRun();
+    }
+  } else if (!st.expect.some(x => entryMatches(x, ev.midi, D.ex))) {
+    Keyboard.flash(ev.midi, 'bad');
+    D.wrong++;
+    st.err = true;
+    st.errs++;
+  }
+  updateHints();
+  drawDrill();
+}
+
+function startTimeline(demo) {
+  stopRun();
+  resetRun();
+  Sound.ctx();
+  const mpb = 60000 / D.bpm;
+  const bar = D.ex.score.barBeats;
+  const countIn = demo ? 0 : bar;
+  const t0 = performance.now() + 500 + countIn * mpb;
+  const totalBeats = D.ex.score.measures.length * bar;
+  D.t0 = t0; D.mpb = mpb; D.running = demo ? 'demo' : 'tempo'; D.statusShown = null; D.demoHintKey = null;
+  D.endT = t0 + totalBeats * mpb + settings.okMs + 100;
+  D.startedAt = performance.now();
+  for (let b = -countIn; b < totalBeats; b++) Sound.click(t0 + b * mpb, mod(b, bar) === 0);
+  // One tone per pitch and onset, as long as the longest note: on a MIDI piano the shorter
+  // copy's note-off would otherwise cut the longer one.
+  const tones = new Map();
+  for (const ev of allEvents(D.ex.score)) {
+    if (ev.rest || ev.ghost || ev.tiedFrom || !(demo || (ev.inactive && D.accompany))) continue;
+    // Rhythm notes have no pitch; demo them on a fixed note per hand.
+    const keys = ev.any ? [midiOf(RHYTHM_NOTE[ev.hand])] : ev.keys;
+    let beats = ev.beats;
+    for (let t = ev.tieTo; t; t = t.tieTo) beats += t.beats;
+    for (const m of keys) {
+      const k = `${m}@${ev.start}`;
+      tones.set(k, { m, start: ev.start, beats: Math.max(beats, tones.has(k) ? tones.get(k).beats : 0) });
+    }
+  }
+  for (const { m, start, beats } of tones.values()) Sound.tone(m, t0 + start * mpb, beats * mpb);
+  for (const s of D.steps) s.time = t0 + s.start * mpb + settings.latencyMs;
+  D.cursor = -1;
+  D.raf = requestAnimationFrame(tick);
+  renderView();
+}
+
+function stopAndReset() { stopRun(); resetRun(); D.finished = null; renderView(); }
+/** The Listen button, or Play again in ear training. Pressing it while the demo plays stops it. */
+function listen() {
+  if (D.ex.display === 'ear') return earPlay(D.ex.refEach || !D.earStarted);
+  if (D.ex.display === 'label' || D.running === 'tempo') return;
+  if (D.running === 'demo') stopAndReset(); else startTimeline(true);
+}
+/** Reset and go straight on: count in for tempo mode, play the first question for ear training. */
+function restartRun() {
+  if (D.mode === 'tempo') return startTimeline(false);
+  stopAndReset();
+  if (D.ex.display === 'ear') earPlay(true);
+}
+
+function tick() {
+  if (!D || !D.running || D.running === 'wait') return;
+  const now = performance.now();
+  let dirty = false;
+  let cur = -1;
+  for (let i = 0; i < D.steps.length; i++) { if (D.steps[i].time - 40 <= now) cur = i; else break; }
+  if (cur !== D.cursor) { D.cursor = cur; D.i = Math.max(0, cur); dirty = true; }
+  if (D.running === 'demo') demoHints(now);
+  if (D.running === 'tempo') {
+    for (const s of D.steps) {
+      if (s.done || s.time + settings.okMs >= now) continue;
+      s.done = true;
+      const allHit = s.expect.every(e => e.hit);
+      const allGood = s.expect.every(e => e.hit && Math.abs(e.dt) <= settings.goodMs);
+      for (const ev of s.events) ev.result = !allHit ? 'bad' : allGood ? 'ok' : 'late';
+      dirty = true;
+    }
+  }
+  const status = document.getElementById('status');
+  if (status && now < D.t0) {
+    const left = Math.ceil((D.t0 - now) / D.mpb);
+    status.innerHTML = `Count-in: <b>${left}</b>`;
+  } else if (status && D.statusShown !== 'play') {
+    status.textContent = D.running === 'demo' ? 'Listening…' : 'Play!';
+    D.statusShown = 'play';
+  }
+  if (dirty) drawScoreOnly();
+  if (now > D.endT) {
+    if (D.running === 'demo') { stopRun(); resetRun(); D.statusShown = null; renderView(); }
+    else finishRun();
+    return;
+  }
+  D.raf = requestAnimationFrame(tick);
+}
+
+/** While Listen plays, light up the keys that sound right now, in each hand's colour. */
+function demoHints(now) {
+  const beat = (now - D.t0) / D.mpb;
+  const list = [];
+  for (const ev of allEvents(D.ex.score)) {
+    if (ev.rest || ev.ghost || !(ev.keys || ev.any)) continue;
+    // Released a little early, so a repeated note lights up again.
+    if (beat < ev.start || beat >= ev.start + ev.beats * 0.9) continue;
+    for (const midi of ev.any ? [midiOf(RHYTHM_NOTE[ev.hand])] : ev.keys) list.push({ midi, hand: ev.hand });
+  }
+  const key = list.map(x => x.midi + x.hand).join();
+  if (key === D.demoHintKey) return;
+  D.demoHintKey = key;
+  Keyboard.setHints(list);
+}
+
+function tempoNote(ev) {
+  let best = null;
+  for (const s of D.steps) {
+    const dt = ev.t - s.time;
+    if (Math.abs(dt) > settings.okMs) continue;
+    const e = s.expect.find(x => !x.hit && entryMatches(x, ev.midi, D.ex));
+    if (e && (!best || Math.abs(dt) < Math.abs(best.dt))) best = { e, dt };
+  }
+  if (best) {
+    best.e.hit = true; best.e.dt = best.dt;
+    Keyboard.flash(ev.midi, Math.abs(best.dt) <= settings.goodMs ? 'good' : 'down');
+  } else {
+    D.wrong++;
+    Keyboard.flash(ev.midi, 'bad');
+  }
+}
+
+function finishRun() {
+  const mode = D.running;
+  cancelAnimationFrame(D.raf);
+  D.running = null;
+  Keyboard.setHints([]);
+  const res = { mode, bpm: D.bpm };
+  if (mode === 'wait') {
+    res.acc = D.clean / D.steps.length;
+    if (D.ex.speed && D.times.length > 1) res.speed = D.times.slice(1).reduce((a, b) => a + b, 0) / (D.times.length - 1) / 1000;
+  } else {
+    const entries = D.steps.flatMap(s => s.expect);
+    const hits = entries.filter(e => e.hit);
+    res.acc = hits.length / (entries.length + D.wrong);
+    res.hits = hits.length; res.total = entries.length;
+    res.good = hits.filter(e => Math.abs(e.dt) <= settings.goodMs).length;
+    res.meanDt = hits.length ? hits.reduce((a, e) => a + e.dt, 0) / hits.length : 0;
+  }
+  res.wrong = D.wrong;
+  res.pass = res.acc >= 0.9;
+  const secs = D.startedAt ? (performance.now() - D.startedAt) / 1000 : 0;
+  // Practising one hand of a piece or a looped section counts as time, not as a level pass.
+  const partial = D.level.piece && (D.hands !== 'both' || D.from !== 1 || D.to !== D.base.score.measures.length);
+  Store.record(D.key, partial ? { ...res, pass: false } : res, secs);
+  res.partial = partial;
+  D.finished = res;
+  renderView();
+}
+
+/* =========================================================================
+   Echo: hands-free call and response. The app plays a melody, you play it back,
+   and difficulty adapts. Built to be used away from the screen, so all feedback
+   is sound and all controls are piano keys.
+   ========================================================================= */
+const whiteKeys = (lo, hi) => scaleRun('C', 1, 50).filter(n => midiOf(n) >= midiOf(lo) && midiOf(n) <= midiOf(hi));
+const allKeys = (lo, hi) => Array.from({ length: midiOf(hi) - midiOf(lo) + 1 }, (_, i) => midiName(midiOf(lo) + i));
+const ECHO_STEPS = [
+  // Single notes: the 4th octave first, then outwards, then black keys.
+  { len: 1, pool: whiteKeys('C4', 'E4') },
+  { len: 1, pool: whiteKeys('C4', 'G4') },
+  { len: 1, pool: whiteKeys('C4', 'B4') },
+  { len: 1, pool: whiteKeys('C4', 'C5') },
+  { len: 1, pool: whiteKeys('G3', 'G5') },
+  { len: 1, pool: whiteKeys('C3', 'C6') },
+  { len: 1, pool: allKeys('C4', 'B4') },
+  { len: 1, pool: allKeys('C3', 'C5') },
+  // Melodies.
+  { len: 2, pool: scaleRun('C', 4, 3), leaps: false },
+  { len: 3, pool: scaleRun('C', 4, 3), leaps: false },
+  { len: 3, pool: scaleRun('C', 4, 5), leaps: false },
+  { len: 4, pool: scaleRun('C', 4, 5), leaps: false },
+  { len: 4, pool: scaleRun('C', 4, 5), leaps: true },
+  { len: 4, pool: scaleRun('C', 4, 8), leaps: false },
+  { len: 5, pool: scaleRun('C', 4, 8), leaps: false },
+  { len: 5, pool: scaleRun('C', 4, 8), leaps: true },
+  { len: 6, pool: scaleRun('C', 4, 8), leaps: true },
+  { len: 5, pool: whiteKeys('G3', 'D5'), leaps: true },
+  { len: 6, pool: whiteKeys('G3', 'D5'), leaps: true },
+  { len: 4, pool: allKeys('C4', 'C5'), leaps: false },
+  { len: 5, pool: allKeys('C4', 'C5'), leaps: true },
+  { len: 7, pool: whiteKeys('G3', 'D5'), leaps: true },
+  { len: 8, pool: scaleRun('C', 4, 8), leaps: true },
+];
+// Piano keys used as controls; far from anything a melody uses.
+const ECHO_KEYS = { replay: 21, easier: 23 };
+const ECHO_REPLAYS_WHEN_IDLE = 2;
+let E = null;
+
+function echoMelody(step) {
+  const pool = step.pool.map(midiOf);
+  let i = rand(pool.length);
+  const out = [];
+  for (let n = 0; n < step.len; n++) {
+    if (n > 0) {
+      if (step.leaps) { let j; do { j = rand(pool.length); } while (j === i); i = j; }
+      else {
+        // Bounce off the edge of the range instead of clamping, which repeated the edge note.
+        const d = pick([-1, 1, 1, -2, 2]);
+        let j = i + d;
+        if (j < 0 || j >= pool.length) j = i - d;
+        i = clamp(j, 0, pool.length - 1);
+      }
+    }
+    out.push(pool[i]);
+  }
+  return out;
+}
+
+// Rhythm cells in beats; 'e e' and 'q. e' add two notes at once.
+const ECHO_CELLS = [[1], [1], [0.5, 0.5], [2], [1.5, 0.5]];
+const BEAT_SYMBOL = { 0.5: '♪', 1: '♩', 1.5: '♩.', 2: '𝅗𝅥' };
+
+/** Note lengths in beats. Without rhythm every note is a quarter. */
+function echoDurations(len) {
+  if (!settings.echoRhythm) return Array(len).fill(1);
+  let out;
+  // Reject all-quarter results: the point of the option is to hear a rhythm.
+  do {
+    out = [];
+    while (out.length < len) out.push(...pick(ECHO_CELLS));
+    out = out.slice(0, len);
+    if (out[len - 1] === 0.5) out[len - 1] = 1;
+  } while (len > 2 && out.slice(0, -1).every(d => d === 1));
+  return out;
+}
+
+/** Compare the gaps between your notes with the melody's, allowing any overall tempo. */
+function echoRhythmOk(durs, times) {
+  const want = durs.slice(0, -1), got = times.slice(1).map((t, i) => t - times[i]);
+  if (want.length < 2) return true;
+  const scale = got.reduce((a, b) => a + b, 0) / want.reduce((a, b) => a + b, 0);
+  return want.every((d, i) => Math.abs(got[i] / scale - d) <= 0.12 + d * 0.18);
+}
+
+function echoStart() {
+  Sound.ctx();
+  const stored = Store.data.echo;
+  // v2 added single-note steps in front, so older saved levels no longer line up.
+  const saved = stored && stored.v === 2 ? stored : { level: 0, best: 0 };
+  E = { level: clamp(saved.level, 0, ECHO_STEPS.length - 1), best: saved.best, streak: 0, running: true,
+    melody: null, pos: 0, fails: 0, busyUntil: 0, timers: [], idleReplays: 0, last: null, startedAt: performance.now() };
+  echoNew();
+}
+
+function echoStop() {
+  if (!E) return;
+  E.timers.forEach(clearTimeout);
+  Sound.stopAll();
+  echoSaveTime();
+  E = null;
+}
+
+function echoLater(fn, ms) { E.timers.push(setTimeout(() => { if (E && E.running) fn(); }, ms)); }
+
+/** Play notes back to back; returns when the last one ends (performance time). */
+function echoPlayNotes(notes, t, noteMs, vel = 80, durs = null) {
+  let at = t;
+  notes.forEach((m, i) => {
+    const len = (durs ? durs[i] : 1) * noteMs;
+    Sound.tone(m, at, len * 0.9, vel);
+    at += len;
+  });
+  return at;
+}
+
+function echoPlay() {
+  E.timers.forEach(clearTimeout); E.timers = [];
+  Sound.stopAll();
+  const noteMs = 60000 / settings.echoBpm;
+  let t = performance.now() + 300;
+  // A single C4 got heard as the melody's first note (melodies often start on C), so the
+  // reference is a soft, low chord: it sets the key but can't be mistaken for the tune.
+  if (settings.echoReference) {
+    for (const m of [48, 52, 55]) Sound.tone(m, t, 900, 55);
+    E.refUntil = t + 900;
+    t += 1600;
+  }
+  const end = echoPlayNotes(E.melody, t, noteMs, 80, E.durs);
+  E.pos = 0; E.times = [];
+  const lastOnset = end - E.durs[E.durs.length - 1] * noteMs;
+  // Answers often start while the last note still rings, so listen from its onset.
+  // The microphone would hear that note itself, so it waits until the melody ends.
+  E.busyUntil = Mic.stream ? end - 80 : lastOnset + 120;
+  E.state = 'playing';
+  if (settings.echoReference) echoLater(renderEcho, E.refUntil - performance.now());
+  echoLater(() => { E.state = 'listening'; renderEcho(); }, end - performance.now());
+  // No answer at all: replay a couple of times, then wait quietly.
+  echoLater(() => { if (E.pos === 0 && E.idleReplays < ECHO_REPLAYS_WHEN_IDLE) { E.idleReplays++; echoPlay(); } }, end - performance.now() + 12000);
+  renderEcho();
+}
+
+function echoNew() {
+  const prev = E.melody ? E.melody.join() : '';
+  let tries = 0;
+  do { E.melody = echoMelody(ECHO_STEPS[E.level]); } while (E.melody.join() === prev && ++tries < 10);
+  E.durs = echoDurations(E.melody.length);
+  E.fails = 0; E.idleReplays = 0;
+  echoPlay();
+}
+
+function echoSaveTime() {
+  const secs = (performance.now() - E.startedAt) / 1000;
+  E.startedAt = performance.now();
+  const d = Store.data.days[today()] = Store.data.days[today()] || { secs: 0, exercises: 0 };
+  d.secs += Math.min(secs, 600);
+  Store.data.echo = { v: 2, level: E.level, best: E.best };
+  Store.save();
+}
+
+function echoNote(ev) {
+  if (!E || !E.running) return;
+  const m = ev.midi;
+  if (m === ECHO_KEYS.replay) { E.idleReplays = 0; echoPlay(); return; }
+  if (m === ECHO_KEYS.easier) { E.level = Math.max(0, E.level - 1); E.streak = 0; echoCue('down'); echoLater(echoNew, 900); return; }
+  // Compare arrival time, not ev.t: Bluetooth MIDI timestamps can lag real time, which made the
+  // first answer note look as if it was played during the melody.
+  if (performance.now() < E.busyUntil || E.state === 'result') return;
+  if (E.state === 'playing') E.state = 'listening';
+  const rhythmMiss = m === E.melody[E.pos] && E.pos === E.melody.length - 1 && settings.echoRhythm
+    && !echoRhythmOk(E.durs, [...E.times, ev.t]);
+  if (m === E.melody[E.pos] && !rhythmMiss) {
+    Keyboard.flash(m, 'good');
+    E.times.push(ev.t);
+    E.pos++;
+    if (E.pos < E.melody.length) { renderEcho(); return; }
+    E.streak++;
+    E.last = { ok: true, melody: E.melody, durs: E.durs };
+    const up = E.level < ECHO_STEPS.length - 1;
+    if (up) E.level++;
+    E.best = Math.max(E.best, E.level);
+    E.state = 'result';
+    echoCue('ok');
+    echoSaveTime();
+    echoLater(echoNew, 1500);
+  } else {
+    Keyboard.flash(m, rhythmMiss ? 'good' : 'bad');
+    E.fails++;
+    E.streak = 0;
+    E.last = { ok: false, rhythm: rhythmMiss, melody: E.melody, durs: E.durs };
+    E.state = 'result';
+    if (E.fails >= 3) {
+      E.level = Math.max(0, E.level - 1);
+      echoCue('down');
+      echoSaveTime();
+      echoLater(echoNew, 1500);
+    } else {
+      echoCue('bad');
+      echoLater(() => { E.idleReplays = 0; echoPlay(); }, 1300);
+    }
+  }
+  renderEcho();
+}
+
+function echoCue(kind) {
+  const t = performance.now() + 250;
+  if (kind === 'ok') echoPlayNotes([72, 76, 79, 84], t, 90, 70);
+  else if (kind === 'bad') { Sound.tone(40, t, 350, 70); Sound.tone(41, t, 350, 70); }
+  else if (kind === 'down') echoPlayNotes([67, 64, 60], t, 140, 60);
+  else if (kind === 'pause') echoPlayNotes([72, 60], t, 200, 60);
+}
+
+function echoPause() {
+  E.timers.forEach(clearTimeout); E.timers = [];
+  E.running = false;
+  echoCue('pause');
+  echoSaveTime();
+  renderEcho();
+}
+
+function echoResume() { E.running = true; E.startedAt = performance.now(); echoNew(); }
+
+function renderEcho() { if (currentView === 'echo') renderView(); }
+
+function echoView() {
+  Keyboard.setRange(48, 84);
+  const root = h('div');
+  const step = E ? ECHO_STEPS[E.level] : null;
+  root.append(h('div', { class: 'card' },
+    h('h2', {}, 'Echo'),
+    h('p', { class: 'muted' }, 'The piano plays a soft C chord to set the key, then a melody. Play the melody back. Get it right and the next one is a little harder; three misses and it gets easier. Everything is sound, so you can practise away from the screen.'),
+    h('p', { class: 'small' }, h('b', {}, 'Controls on the piano: '), 'lowest key (A0) = play again · B0 = easier · highest key (C8) = pause and navigate.'),
+    Midi.out && settings.demoSound === 'piano' ? null : h('p', { class: 'small', style: `color:${COLORS.late}` }, 'No MIDI output: melodies play on this computer, not the piano.'),
+    h('div', { class: 'row' },
+      !E ? h('button', { class: 'primary', onclick: () => { echoStart(); renderEcho(); } }, '▶ Start')
+        : E.running ? h('button', { class: 'primary', onclick: echoPause }, '❚❚ Pause')
+          : h('button', { class: 'primary', onclick: echoResume }, '▶ Resume'),
+      E && E.running ? h('button', { onclick: () => { E.idleReplays = 0; echoPlay(); } }, '🔊 Play again') : null,
+      h('label', { class: 'row' }, 'Tempo', h('input', { type: 'range', min: 50, max: 160, step: 5, value: settings.echoBpm,
+        oninput: e => { settings.echoBpm = +e.target.value; Store.save(); e.target.nextSibling.textContent = `${settings.echoBpm} bpm`; } }), h('span', {}, `${settings.echoBpm} bpm`)),
+      h('label', { class: 'row small' }, h('input', { type: 'checkbox', checked: settings.echoReference,
+        onchange: e => { settings.echoReference = e.target.checked; Store.save(); } }), 'Play a C chord first (sets the key)'),
+      h('label', { class: 'row small', title: 'Melodies get mixed note lengths, and your rhythm must match (any tempo).' },
+        h('input', { type: 'checkbox', checked: settings.echoRhythm,
+          onchange: e => { settings.echoRhythm = e.target.checked; Store.save(); if (E && E.running) echoNew(); } }), 'Rhythm'))));
+  if (E) {
+    const statusText = !E.running ? 'Paused' : E.state === 'playing' ? (performance.now() < (E.refUntil || 0) ? 'Key chord…' : 'Listen…') : E.state === 'result' ? (E.last.ok ? '✓ Correct' : E.last.rhythm ? 'Right notes, rhythm off' : 'Not quite, listen again') : `Your turn · note ${E.pos + 1} of ${E.melody.length}`;
+    root.append(h('div', { class: 'card' },
+      h('div', { class: 'stats' },
+        h('div', {}, h('span', {}, 'Level'), `${E.level + 1} of ${ECHO_STEPS.length}`),
+        h('div', {}, h('span', {}, 'Notes'), step.len),
+        h('div', {}, h('span', {}, 'Streak'), E.streak),
+        h('div', {}, h('span', {}, 'Best level'), E.best + 1)),
+      h('div', { class: 'label-card', style: 'color:inherit;padding:20px 0' }, h('div', { class: 'big', style: 'font-size:40px' }, statusText),
+        E.last ? h('div', { class: 'sub' }, (E.last.ok ? 'Last melody: ' : 'The melody was: ') + E.last.melody.map((x, i) => pretty(midiName(x)) + (settings.echoRhythm ? ' ' + BEAT_SYMBOL[E.last.durs[i]] : '')).join('  ')) : null)));
+  }
+  return root;
+}
+
+/* =========================================================================
+   Record: play along with a metronome; the app writes down what you played.
+   Recordings are kept as raw notes in beats, so the notation options can change later.
+   ========================================================================= */
+const R = { phase: 'idle', raw: [], open: new Map(), timers: [], clickTimer: null, bpm: 80, title: '', loadedId: null, result: null, score: null };
+const REC_SPLITS = ['F3', 'G3', 'A3', 'B3', 'C4', 'D4', 'E4', 'F4', 'G4'];
+const REC_KEYS = ['C', 'G', 'D', 'A', 'E', 'F', 'Bb', 'Eb', 'Ab'];
+const recBarBeats = () => { const [n, d] = settings.recTime.split('/').map(Number); return n * 4 / d; };
+
+function recStart() {
+  recStopSound();
+  Sound.ctx();
+  R.raw = []; R.open = new Map(); R.result = null; R.score = null; R.loadedId = null; R.title = '';
+  R.bpm = settings.recBpm;
+  R.mpb = 60000 / R.bpm;
+  const bar = recBarBeats();
+  R.t0 = performance.now() + 400 + bar * R.mpb;
+  R.nextBeat = -bar;
+  R.phase = 'countin';
+  // Clicks are scheduled a little ahead in a loop, since the length of a take isn't known up front.
+  R.clickTimer = setInterval(recClicks, 100);
+  recClicks();
+  R.timers.push(setTimeout(() => { if (R.phase === 'countin') { R.phase = 'recording'; renderRecord(); } }, R.t0 - performance.now()));
+  renderRecord();
+}
+
+function recClicks() {
+  const bar = recBarBeats(), now = performance.now();
+  while (R.t0 + R.nextBeat * R.mpb < now + 400) {
+    if (settings.recClick || R.nextBeat < 0) Sound.click(R.t0 + R.nextBeat * R.mpb, mod(R.nextBeat, bar) === 0);
+    R.nextBeat++;
+  }
+  const el = document.getElementById('rec-status');
+  if (!el) return;
+  if (R.phase === 'countin') el.innerHTML = `Count-in: <b>${Math.ceil((R.t0 - now) / R.mpb)}</b>`;
+  else if (R.phase === 'recording') el.innerHTML = `● Recording · bar <b>${Math.floor((now - R.t0) / R.mpb / bar) + 1}</b> · ${R.raw.length + R.open.size} notes`;
+}
+
+function recNote(ev) {
+  if (R.phase !== 'countin' && R.phase !== 'recording') return;
+  // Same offset as tempo mode, so one setting corrects both.
+  const beat = (ev.t - settings.latencyMs - R.t0) / R.mpb;
+  if (ev.type === 'on') R.open.set(ev.midi, { m: ev.midi, on: beat });
+  else if (R.open.has(ev.midi)) {
+    const n = R.open.get(ev.midi);
+    R.open.delete(ev.midi);
+    n.off = beat;
+    R.raw.push(n);
+  }
+}
+
+function recStop() {
+  clearInterval(R.clickTimer); R.clickTimer = null;
+  R.timers.forEach(clearTimeout); R.timers = [];
+  if (R.phase === 'countin' || R.phase === 'recording') {
+    const beat = (performance.now() - settings.latencyMs - R.t0) / R.mpb;
+    for (const n of R.open.values()) { n.off = beat; R.raw.push(n); }
+    R.open.clear();
+    R.raw = R.raw.map(n => ({ m: n.m, on: +n.on.toFixed(3), off: +n.off.toFixed(3) })).sort((a, b) => a.on - b.on);
+    R.phase = R.raw.some(n => n.on > -settings.recGrid) ? 'done' : 'idle';
+    recTranscribe();
+  }
+  Sound.stopAll();
+}
+
+function recStopSound() { Sound.stopAll(); }
+
+function recTranscribe() {
+  R.result = R.raw.length ? transcribe(R.raw, { time: settings.recTime, grid: settings.recGrid, key: settings.recKey, split: midiOf(settings.recSplit) }) : null;
+  R.score = R.result ? makeScore({ ...R.result, numbers: true }) : null;
+  if (!R.result) R.phase = 'idle';
+}
+
+function recPlay(asPlayed) {
+  Sound.stopAll();
+  Sound.ctx();
+  const mpb = 60000 / R.bpm, t0 = performance.now() + 300;
+  if (asPlayed) {
+    for (const n of R.raw) if (n.on > -settings.recGrid) Sound.tone(n.m, t0 + Math.max(0, n.on) * mpb, (n.off - n.on) * mpb);
+    return;
+  }
+  for (const ev of allEvents(R.score)) {
+    if (!ev.keys || ev.tiedFrom) continue;
+    let beats = ev.beats;
+    for (let t = ev.tieTo; t; t = t.tieTo) beats += t.beats;
+    for (const m of ev.keys) Sound.tone(m, t0 + ev.start * mpb, beats * mpb);
+  }
+}
+
+function recSave(asNew) {
+  const list = Store.data.recordings;
+  const entry = { title: R.title.trim() || `Recording ${new Date().toLocaleString('sv-SE').slice(0, 16)}`, date: today(),
+    bpm: R.bpm, time: settings.recTime, grid: settings.recGrid, key: settings.recKey, split: settings.recSplit, raw: R.raw };
+  const existing = !asNew && R.loadedId && list.find(r => r.id === R.loadedId);
+  if (existing) Object.assign(existing, entry);
+  else { entry.id = 'r' + Date.now(); list.push(entry); R.loadedId = entry.id; }
+  R.title = entry.title;
+  Store.save();
+  refreshMine();
+  toast('Saved to My recordings');
+  renderRecord();
+}
+
+function recLoad(rec) {
+  recStop();
+  Object.assign(settings, { recTime: rec.time, recGrid: rec.grid, recKey: rec.key, recSplit: rec.split });
+  R.raw = rec.raw; R.bpm = rec.bpm; R.title = rec.title; R.loadedId = rec.id; R.phase = 'done';
+  recTranscribe();
+  renderRecord();
+  window.scrollTo(0, 0);
+}
+
+/** "My recordings" is a track whose levels are the saved recordings, so they open like any piece. */
+function refreshMine() {
+  const t = TRACK_BY_ID.mine;
+  t.levels = Store.data.recordings.map(rec => ({
+    id: rec.id, name: rec.title, piece: true, bpm: rec.bpm, desc: `Recorded ${rec.date} at ${rec.bpm} bpm.`,
+    gen: () => ({ score: makeScore({ ...transcribe(rec.raw, { time: rec.time, grid: rec.grid, key: rec.key, split: midiOf(rec.split) }), numbers: true }) }),
+  }));
+}
+
+function renderRecord() {
+  if (currentView !== 'record') return;
+  renderView();
+}
+
+function recordView() {
+  Keyboard.setRange(21, 108);
+  const busy = R.phase === 'countin' || R.phase === 'recording';
+  const setOpt = (k, v) => { settings[k] = v; Store.save(); if (R.raw.length && !busy) { recTranscribe(); renderRecord(); } };
+  const sel = (k, opts, conv = x => x) => h('select', { disabled: busy && k === 'recTime', onchange: e => setOpt(k, conv(e.target.value)) },
+    opts.map(([v, t]) => h('option', { value: v, selected: String(settings[k]) === String(v) }, t)));
+  const root = h('div');
+  root.append(h('div', { class: 'card' },
+    h('h2', {}, 'Record'),
+    h('p', { class: 'muted' }, 'Play along with the click and the app writes down what you played. It snaps notes to the beat grid, so play in time with the metronome. You get one bar of count-in.'),
+    h('div', { class: 'row' },
+      busy ? h('button', { class: 'primary', onclick: () => { recStop(); renderRecord(); } }, '■ Stop')
+        : h('button', { class: 'primary', onclick: recStart }, '● Record'),
+      h('label', { class: 'row' }, 'Tempo', h('input', { type: 'range', min: 40, max: 160, step: 5, value: settings.recBpm, disabled: busy,
+        oninput: e => { settings.recBpm = +e.target.value; e.target.nextSibling.textContent = `${settings.recBpm} bpm`; }, onchange: () => Store.save() }),
+        h('span', {}, `${settings.recBpm} bpm`)),
+      h('label', { class: 'row' }, 'Time', sel('recTime', [['4/4', '4/4'], ['3/4', '3/4'], ['2/4', '2/4']])),
+      h('label', { class: 'row small' }, h('input', { type: 'checkbox', checked: settings.recClick, onchange: e => { settings.recClick = e.target.checked; Store.save(); } }),
+        'Click while recording (count-in always clicks)')),
+    h('div', { class: 'status', id: 'rec-status' }, R.phase === 'idle' && R.raw.length ? 'Nothing was recorded after the count-in.' : '')));
+  if (busy) setTimeout(recClicks, 0);
+
+  if (R.score && !busy) {
+    const detected = settings.recKey === 'auto' ? ` (${pretty(R.result.key)})` : '';
+    root.append(h('div', { class: 'card' },
+      h('div', { class: 'row' },
+        h('label', { class: 'row' }, 'Shortest note', sel('recGrid', [[1, 'Quarter'], [0.5, 'Eighth'], [0.25, 'Sixteenth']], Number)),
+        h('label', { class: 'row' }, 'Key', sel('recKey', [['auto', 'Detect' + detected], ...REC_KEYS.map(k => [k, pretty(k) + ' major'])])),
+        h('label', { class: 'row', title: 'Notes from this key upwards go to the right hand.' }, 'Right hand from', sel('recSplit', REC_SPLITS.map(n => [n, n === 'C4' ? 'C4 (middle C)' : n]))),
+        h('span', { class: 'spacer' }),
+        h('button', { onclick: () => recPlay(true) }, '▶ As played'),
+        h('button', { onclick: () => recPlay(false) }, '▶ As written'),
+        h('button', { onclick: () => Sound.stopAll() }, '■')),
+      h('div', { class: 'score-wrap', id: 'score', style: 'margin-top:10px' }),
+      h('div', { class: 'row', style: 'margin-top:10px' },
+        h('input', { type: 'text', placeholder: 'Title', value: R.title, style: 'flex:1;min-width:180px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)',
+          oninput: e => { R.title = e.target.value; } }),
+        h('button', { class: 'primary', onclick: () => recSave(false) }, R.loadedId ? 'Save changes' : 'Save'),
+        R.loadedId ? h('button', { onclick: () => recSave(true) }, 'Save as new') : null)));
+  }
+
+  const list = Store.data.recordings;
+  root.append(h('div', { class: 'card' }, h('h3', {}, 'My recordings'),
+    !list.length ? h('p', { class: 'muted small' }, 'Saved recordings appear here and under "My recordings" on Home, where you can practise them like any piece.') : null,
+    h('div', { class: 'levels' }, list.map((rec, i) => {
+      let armed = false;
+      const del = h('button', { onclick: () => {
+        if (!armed) { armed = true; del.textContent = 'Really delete?'; return; }
+        Store.data.recordings.splice(i, 1); Store.save(); refreshMine();
+        if (R.loadedId === rec.id) R.loadedId = null;
+        renderRecord();
+      } }, 'Delete');
+      return h('div', { class: 'row', style: 'padding:4px 0;border-bottom:1px solid var(--line)' },
+        h('span', { style: 'flex:1' }, h('b', {}, rec.title), h('span', { class: 'muted small' }, ` · ${rec.date} · ${rec.bpm} bpm · ${rec.time}`)),
+        h('button', { class: 'primary', onclick: () => { recStop(); openLevel('mine', i); } }, 'Practise'),
+        h('button', { onclick: () => recLoad(rec) }, 'Edit'),
+        del);
+    }))));
+  return root;
+}
+
+function drawRecordScore() {
+  const wrap = document.getElementById('score');
+  if (!wrap || !R.score || !window.Vex) return;
+  try { renderScore(wrap, R.score); } catch (e) { console.error(e); wrap.textContent = 'Could not draw this recording: ' + e.message; }
+}
+
+/* =========================================================================
+   Views
+   ========================================================================= */
+let currentView = 'home';
+
+function renderView() {
+  const view = document.getElementById('view');
+  view.innerHTML = '';
+  for (const b of document.querySelectorAll('[data-nav]')) b.classList.toggle('primary', b.dataset.nav === currentView);
+  if (currentView === 'home') view.append(homeView());
+  else if (currentView === 'drill') { view.append(drillView()); drawDrill(); }
+  else if (currentView === 'theory') view.append(theoryView());
+  else if (currentView === 'echo') view.append(echoView());
+  else if (currentView === 'record') { view.append(recordView()); drawRecordScore(); }
+  else if (currentView === 'settings') view.append(settingsView());
+  Nav.refresh();
+  syncRoute();
+  Wake.update();
+}
+
+/* =========================================================================
+   Keep the screen on while playing
+   ========================================================================= */
+const Wake = {
+  lock: null, pending: false,
+  /** An open exercise counts even when idle: in wait mode the screen sits still while you read. */
+  wanted() {
+    return document.visibilityState === 'visible' && ((currentView === 'drill' && !!D) || Nav.playing());
+  },
+  async update() {
+    if (!navigator.wakeLock || this.pending) return;
+    if (this.wanted() && !this.lock) {
+      this.pending = true;
+      try {
+        const lock = await navigator.wakeLock.request('screen');
+        this.lock = lock;
+        // The browser drops the lock when the tab is hidden or the battery is low.
+        lock.addEventListener('release', () => { if (this.lock === lock) this.lock = null; this.show(); });
+      } catch (e) { /* refused (battery saver, permissions): the chip stays hidden, which is the truth */ }
+      this.pending = false;
+      if (!this.wanted()) return this.update();
+    } else if (!this.wanted() && this.lock) {
+      const lock = this.lock;
+      this.lock = null;
+      lock.release().catch(() => {});
+    }
+    this.show();
+  },
+  show() { document.getElementById('chip-awake').hidden = !this.lock; },
+};
+
+/* =========================================================================
+   URL: the hash names the page, so a reload or the Back button lands in the same place.
+     #home  #echo  #record  #theory  #settings  #drill/<track>/<level>
+   ========================================================================= */
+function currentRoute() {
+  if (currentView === 'drill' && D) return `drill/${D.track.id}/${encodeURIComponent(D.level.id)}`;
+  return currentView;
+}
+function syncRoute() {
+  const r = '#' + currentRoute();
+  // Assigning the hash adds a history entry; openRoute then sees the page already matches and does nothing.
+  if (location.hash !== r) location.hash = r;
+}
+function openRoute() {
+  const r = location.hash.slice(1);
+  if (r === currentRoute() && document.getElementById('view').childElementCount) return;
+  const [view, trackId, rawLevel = ''] = r.split('/');
+  const levelId = decodeURIComponent(rawLevel);
+  if (view === 'drill') {
+    const track = TRACK_BY_ID[trackId];
+    const idx = track ? track.levels.findIndex(l => l.id === levelId) : -1;
+    if (idx >= 0) { session = null; return openLevel(trackId, idx); }
+  }
+  go(['echo', 'record', 'theory', 'settings'].includes(view) ? view : 'home');
+}
+
+/* =========================================================================
+   Navigate the UI from the piano
+   ========================================================================= */
+// C8 toggles the mode from anywhere; it is never part of an exercise or a melody.
+// The other keys sit just below it, so one hand can stay at the top of the piano.
+// Press is the black key between one-step back and forward.
+const NAV_KEYS = { toggle: 108, sectionNext: 107, next: 105, press: 104, prev: 103, sectionPrev: 101, home: 100 };
+const Nav = {
+  on: false, el: null, idx: 0,
+  targets() {
+    return [...document.querySelectorAll('header button, #view button, #view select, #view input[type=checkbox], #kbd-toggle')]
+      .filter(el => !el.disabled && el.getClientRects().length);
+  },
+  playing() {
+    if (currentView === 'drill') return !!(D && D.running);
+    if (currentView === 'echo') return !!(E && E.running);
+    if (currentView === 'record') return R.phase === 'countin' || R.phase === 'recording';
+    return false;
+  },
+  handle(ev) {
+    if (ev.midi === NAV_KEYS.toggle) { if (ev.type === 'on') this.set(!this.on); return true; }
+    if (!this.on) return false;
+    if (ev.type !== 'on') return true;
+    if (ev.midi === NAV_KEYS.prev) this.move(-1);
+    else if (ev.midi === NAV_KEYS.next) this.move(1);
+    else if (ev.midi === NAV_KEYS.sectionPrev) this.moveSection(-1);
+    else if (ev.midi === NAV_KEYS.sectionNext) this.moveSection(1);
+    else if (ev.midi === NAV_KEYS.press) this.press();
+    else if (ev.midi === NAV_KEYS.home) { go('home'); this.focus(this.firstTarget()); }
+    return true;
+  },
+  set(on) {
+    this.on = on;
+    document.getElementById('chip-nav').hidden = !on;
+    if (on) {
+      // Pause whatever runs in time, so the clock doesn't count the time spent navigating.
+      if (currentView === 'echo' && E && E.running) echoPause();
+      else if (currentView === 'drill' && D && D.running && D.running !== 'wait') { stopRun(); resetRun(); renderView(); }
+      else if (currentView === 'record' && this.playing()) { recStop(); renderView(); }
+      this.focus(this.firstTarget());
+      Keyboard.setHints(Object.values(NAV_KEYS).filter(m => m !== NAV_KEYS.toggle).map(midi => ({ midi, hand: 'rh' })));
+    } else {
+      this.focus(null);
+      if (currentView === 'drill') updateHints(); else Keyboard.setHints([]);
+    }
+  },
+  /** The main action of the page, such as Start, rather than the header. */
+  firstTarget() {
+    const list = this.targets();
+    return document.querySelector('#view button.primary:not(:disabled)') || list.find(el => el.closest('#view')) || list[0];
+  },
+  focus(el) {
+    if (this.el) this.el.classList.remove('nav-focus');
+    this.el = el || null;
+    if (!this.el) return;
+    this.el.classList.add('nav-focus');
+    this.idx = Math.max(0, this.targets().indexOf(this.el));
+    this.el.scrollIntoView({ block: 'nearest' });
+  },
+  move(d) {
+    const list = this.targets();
+    if (!list.length) return;
+    const i = list.indexOf(this.el);
+    this.focus(list[i < 0 ? 0 : mod(i + d, list.length)]);
+  },
+  /** A card, the header, the keyboard dock, or a top-level block of the page. */
+  section(el) {
+    const view = document.getElementById('view');
+    let top = el;
+    while (top.parentElement && top.parentElement.parentElement !== view) top = top.parentElement;
+    return el.closest('header, .card, #kbd-dock') || top;
+  },
+  /** Jump to the first button of the next or previous section. */
+  moveSection(d) {
+    const list = this.targets();
+    if (!list.length) return;
+    const n = list.length, sec = el => this.section(el);
+    let i = list.indexOf(this.el);
+    if (i < 0) return this.focus(list[0]);
+    const start = sec(list[i]);
+    if (d > 0) {
+      let k = 1;
+      while (k < n && sec(list[mod(i + k, n)]) === start) k++;
+      return this.focus(list[mod(i + k, n)]);
+    }
+    // Back to the start of the current section first, then one more step back lands in the previous one.
+    let k = 1;
+    while (k < n && sec(list[mod(i - k, n)]) === start) k++;
+    const prev = sec(list[mod(i - k, n)]);
+    while (k < n && sec(list[mod(i - k - 1, n)]) === prev) k++;
+    this.focus(list[mod(i - k, n)]);
+  },
+  press() {
+    const el = this.el;
+    if (!el || !el.isConnected) return this.focus(this.firstTarget());
+    const view = currentView, wasPlaying = this.playing();
+    if (el.tagName === 'SELECT') {
+      el.selectedIndex = mod(el.selectedIndex + 1, el.options.length);
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    } else el.click();
+    // Starting to play ends the mode, so the next notes count as music.
+    if (!wasPlaying && this.playing()) return this.set(false);
+    if (currentView !== view) this.focus(this.firstTarget());
+  },
+  /** A re-render replaces the elements, so find the focused one again by its position. */
+  refresh() {
+    if (!this.on || (this.el && this.el.isConnected)) return;
+    const list = this.targets();
+    this.focus(list[clamp(this.idx, 0, list.length - 1)]);
+  },
+};
+
+function go(v) {
+  if (v !== 'drill') { stopRun(); D = null; Keyboard.setRange(21, 108); }
+  if (v !== 'echo') echoStop();
+  if (v !== 'record') recStop();
+  currentView = v;
+  renderView();
+  window.scrollTo(0, 0);
+}
+
+function stars(passes) { return '★'.repeat(Math.min(3, passes)) + '☆'.repeat(Math.max(0, 3 - passes)); }
+
+function suggestedSession() {
+  const pickLvl = id => ({ track: TRACK_BY_ID[id], idx: currentLevelIdx(TRACK_BY_ID[id]) });
+  const hands = TRACK_BY_ID.hands;
+  const dayNum = Math.floor(Date.now() / 86400000);
+  return [
+    pickLvl('technique'),
+    pickLvl('reading'),
+    currentLevelIdx(hands) < 2 ? pickLvl('hands') : pickLvl('together'),
+    pickLvl('rhythm'),
+    pickLvl(dayNum % 2 ? 'scales' : 'chords'),
+    pickLvl('ear'),
+    pickLvl('pieces'),
+  ];
+}
+
+function homeView() {
+  const d = Store.data.days[today()];
+  const mins = d ? Math.round(d.secs / 60) : 0;
+  const items = suggestedSession();
+  const root = h('div');
+  root.append(h('div', { class: 'card session' },
+    h('div', { class: 'row' }, h('h2', {}, 'Today'), h('span', { class: 'spacer' }),
+      h('span', { class: 'muted small' }, `${mins} min practised today · ${Store.streak()}-day streak`)),
+    h('p', { class: 'muted small' }, 'A mixed 15–20 minute session. It picks up the level you are on in each track.'),
+    h('ol', {}, items.map((it, n) => {
+      const lvl = it.track.levels[it.idx];
+      const done = Store.level(levelKey(it.track.id, lvl)).last === today();
+      return h('li', {},
+        h('span', { class: 'done' }, done ? '✓' : ''),
+        h('span', { style: 'flex:1' }, h('b', {}, it.track.name), ' · ', lvl.name),
+        h('button', { class: n === items.findIndex(x => Store.level(levelKey(x.track.id, x.track.levels[x.idx])).last !== today()) ? 'primary' : '',
+          onclick: () => { session = { items, n }; openLevel(it.track.id, it.idx); } }, done ? 'Again' : 'Start'));
+    }))));
+  root.append(h('div', { class: 'grid' }, TRACKS.filter(t => t.levels.length).map(track => {
+    const cur = currentLevelIdx(track);
+    return h('div', { class: 'card' },
+      h('h3', {}, track.name), h('div', { class: 'muted small' }, track.desc),
+      h('div', { class: 'levels' }, track.levels.map((lvl, i) => {
+        const rec = Store.level(levelKey(track.id, lvl));
+        const cls = 'lvl' + (isUnlocked(track, i) ? '' : ' locked') + (i === cur ? ' current' : '');
+        return h('button', { class: cls, title: isUnlocked(track, i) ? '' : 'Pass the previous level to unlock. You can still open it.',
+          onclick: () => { session = null; openLevel(track.id, i); } },
+          h('span', { class: 'n' }, i + 1), h('span', { class: 't' }, lvl.name), h('span', { class: 'stars' }, stars(rec.passes)));
+      })));
+  })));
+  root.append(h('p', { class: 'muted small' }, 'A level unlocks the next one when you score 90% or more. Three passes earn three stars and move the session on to the next level.'));
+  return root;
+}
+
+function drillView() {
+  const { track, level, idx } = D;
+  const root = h('div');
+  const rec = Store.level(D.key);
+  root.append(h('div', { class: 'drill-head' },
+    h('button', { onclick: () => go('home') }, '← Home'),
+    h('div', { style: 'flex:1' },
+      h('div', { class: 'muted small' }, `${track.name} · level ${idx + 1} of ${track.levels.length}`),
+      h('h2', {}, level.name),
+      level.desc ? h('div', { class: 'muted small' }, level.desc) : null),
+    h('div', { class: 'muted small', style: 'text-align:right' }, h('span', { class: 'stars', style: 'color:#e0a800' }, stars(rec.passes)), h('br'),
+      rec.bestAcc != null ? `Best ${Math.round(rec.bestAcc * 100)}%` : '', rec.bestSpeed ? ` · ${rec.bestSpeed.toFixed(1)} s/note` : '')));
+
+  if (level.theory) {
+    const card = THEORY[level.theory];
+    const open = !Store.data.theorySeen[level.theory] || D.showTheory;
+    if (open) root.append(h('div', { class: 'card theory', style: 'margin-top:12px' },
+      h('h3', {}, card.title), h('div', { html: card.html }),
+      h('button', { class: 'primary', onclick: () => { Store.data.theorySeen[level.theory] = true; Store.save(); D.showTheory = false; renderView(); } }, 'Got it')));
+  }
+
+  const controls = h('div', { class: 'row', style: 'margin-top:12px' });
+  if (D.modes.length > 1) {
+    controls.append(h('div', { class: 'seg' }, D.modes.map(m => h('button', {
+      class: D.mode === m ? 'sel' : '', title: m === 'wait' ? 'The music waits for you to play the right notes' : 'Play in time with the metronome',
+      onclick: () => { stopRun(); D.mode = m; resetRun(); renderView(); } }, m === 'wait' ? 'Wait for me' : 'In tempo'))));
+  }
+  const bpmOut = h('span', { style: 'min-width:60px' }, `${D.bpm} bpm`);
+  controls.append(h('label', { class: 'row' }, 'Tempo',
+    h('input', { type: 'range', min: 30, max: 160, step: 5, value: D.bpm,
+      oninput: e => { D.bpm = +e.target.value; bpmOut.textContent = `${D.bpm} bpm`; } }), bpmOut));
+  if (D.level.piece || D.ex.score.measures.some(m => m.rh.some(e => e.keys) && m.lh.some(e => e.keys))) {
+    controls.append(h('label', { class: 'row' }, 'Hands',
+      h('select', { onchange: e => { D.hands = e.target.value; stopRun(); resetRun(); renderView(); } },
+        [['both', 'Both'], ['rh', 'Right only'], ['lh', 'Left only']].map(([v, t]) => h('option', { value: v, selected: D.hands === v }, t)))));
+    if (D.hands !== 'both' && D.mode === 'tempo') {
+      controls.append(h('label', { class: 'row small' }, h('input', { type: 'checkbox', checked: D.accompany, onchange: e => { D.accompany = e.target.checked; } }), 'Play the other hand for me'));
+    }
+  }
+  if (D.level.piece) {
+    const n = D.base.score.measures.length;
+    const num = (val, set) => h('input', { type: 'number', min: 1, max: n, value: val, style: 'width:56px',
+      onchange: e => { set(clamp(+e.target.value || 1, 1, n)); if (D.from > D.to) D.to = D.from; newExercise(false); } });
+    controls.append(h('label', { class: 'row' }, 'Bars', num(D.from, v => { D.from = v; }), 'to', num(D.to, v => { D.to = v; })));
+  }
+  controls.append(h('span', { class: 'spacer' }));
+  if (level.theory && Store.data.theorySeen[level.theory] && !D.showTheory) controls.append(h('button', { onclick: () => { D.showTheory = true; renderView(); } }, '? Theory'));
+  if (D.ex.display === 'ear') {
+    controls.append(h('button', { class: D.earStarted ? '' : 'primary', onclick: () => earPlay(D.ex.refEach || !D.earStarted) }, D.earStarted ? '🔊 Play again' : '▶ Start'));
+    if (D.ex.reference) controls.append(h('button', { onclick: () => { for (const m of D.ex.reference) Sound.tone(m, performance.now() + 50, 800); } }, 'Reference'));
+  } else if (D.ex.display !== 'label') {
+    controls.append(D.running === 'demo'
+      ? h('button', { class: 'primary', onclick: stopAndReset }, '■ Stop')
+      : h('button', { disabled: D.running === 'tempo', onclick: () => startTimeline(true), title: 'Piano: A♯0' }, '▶ Listen'));
+  }
+  controls.append(h('button', { onclick: restartRun, title: 'Piano: lowest key (A0)' }, '↺ Restart'));
+  if (!isFixed() && !D.level.piece) controls.append(h('button', { onclick: () => newExercise(true) }, 'New exercise'));
+  controls.append(nextExerciseBtn());
+  if (D.mode === 'tempo') {
+    controls.append(D.running === 'tempo'
+      ? h('button', { class: 'primary', onclick: stopAndReset }, '■ Stop')
+      : h('button', { class: 'primary', disabled: D.running === 'demo', onclick: () => startTimeline(false) }, 'Start'));
+  }
+  root.append(controls);
+
+  // Results go above the score: the score fills the space down to the fixed keyboard, so anything below it is hidden.
+  if (D.finished) root.append(resultsCard(D.finished));
+  root.append(h('div', { class: 'status', id: 'status' }));
+  root.append(h('div', { class: 'score-wrap', id: 'score' }));
+  return root;
+}
+
+function resultsCard(res) {
+  const pct = Math.round(res.acc * 100);
+  const stats = [h('div', {}, h('span', {}, 'Accuracy'), `${pct}%`)];
+  if (res.speed) stats.push(h('div', {}, h('span', {}, 'Reading speed'), `${res.speed.toFixed(2)} s per note`));
+  if (res.mode === 'tempo') {
+    stats.push(h('div', {}, h('span', {}, 'Notes hit'), `${res.hits} / ${res.total}`));
+    stats.push(h('div', {}, h('span', {}, `Right on time (±${settings.goodMs} ms)`), `${res.good}`));
+    const dt = Math.round(res.meanDt);
+    stats.push(h('div', {}, h('span', {}, 'Average timing'), Math.abs(dt) < 15 ? 'spot on' : dt < 0 ? `${-dt} ms early` : `${dt} ms late`));
+  }
+  stats.push(h('div', {}, h('span', {}, 'Wrong notes'), res.wrong));
+  let msg;
+  if (res.partial) msg = 'Section practice saved. Play the whole piece with both hands to pass the level.';
+  else if (res.pass) msg = res.mode === 'wait' && D.modes.includes('tempo') ? 'Passed! Next challenge: try it in tempo.' : 'Passed!';
+  else msg = res.mode === 'tempo' ? 'Not quite. Lower the tempo, or practise it in wait mode first.' : 'Not quite. Try again. Accuracy matters more than speed.';
+  const inSession = session && session.items[session.n] && session.items[session.n].track === D.track && session.n + 1 < session.items.length;
+  return h('div', { class: 'card results ' + (res.pass ? 'pass' : 'fail'), style: 'margin-top:12px' },
+    h('div', { class: 'big' }, res.pass ? '✓ ' + msg : msg),
+    h('div', { class: 'stats' }, stats),
+    h('div', { class: 'row' },
+      h('button', { onclick: restartRun }, 'Same again'),
+      !isFixed() && !D.level.piece ? h('button', { class: res.pass ? '' : 'primary', onclick: () => newExercise(true) }, 'New exercise') : null,
+      nextExerciseBtn(res.pass && !inSession ? 'primary' : ''),
+      inSession ? h('button', { class: 'primary', onclick: () => { session.n++; const it = session.items[session.n]; openLevel(it.track.id, it.idx); } }, 'Next in session →') : null));
+}
+
+function drawDrill() {
+  drawScoreOnly();
+  const status = document.getElementById('status');
+  if (!status || !D) return;
+  if (D.finished) { status.textContent = ''; return; }
+  if (D.running === 'wait') {
+    const st = curStep();
+    if (D.ex.display === 'ear') {
+      const nBars = D.ex.score.measures.length;
+      status.innerHTML = !D.earStarted ? 'Press <b>Start</b> to hear the first question.'
+        : `Play what you hear · question <b>${Math.min(st.bar + 1, nBars)}</b> / ${nBars}` + (D.wrong ? ` · ${D.wrong} wrong` : '');
+      return;
+    }
+    const what = D.ex.display === 'label' ? 'Play the chord' : D.ex.anyPitch ? 'Tap any key' : 'Play the blue note' + (st && st.expect.length > 1 ? 's' : '');
+    status.innerHTML = `${what} · <b>${D.i + 1}</b> / ${D.steps.length}` + (D.wrong ? ` · ${D.wrong} wrong` : '');
+  } else if (!D.running) {
+    status.textContent = D.mode === 'tempo' ? `Press Start. You get one bar of count-in at ${D.bpm} bpm.` : '';
+  }
+}
+
+function drawScoreOnly() {
+  const wrap = document.getElementById('score');
+  if (!wrap || !D) return;
+  if (!window.Vex) { wrap.innerHTML = '<p style="padding:16px;color:#b91c1c">Notation library not loaded. See the message at the top.</p>'; return; }
+  const st = D.running && D.running !== 'wait' ? D.steps[D.cursor] : curStep();
+  if (D.ex.display === 'ear') {
+    const nQ = st ? D.steps.filter(s => s.bar === st.bar).length : 0;
+    const sub = D.ex.matchPc ? 'Any octave, any inversion' : nQ > 1 ? `${nQ} notes, in order` : 'One note';
+    wrap.innerHTML = '';
+    wrap.append(h('div', { class: 'label-card' },
+      D.reveal ? h('div', { class: 'sub', style: `color:${D.reveal.ok ? COLORS.ok : COLORS.late}` }, (D.reveal.ok ? '✓ ' : 'Got there: ') + D.reveal.text) : h('div', { class: 'sub' }, ' '),
+      h('div', { class: 'big' }, D.finished ? '✓' : '?'),
+      h('div', { class: 'sub' }, D.finished ? '' : sub)));
+    return;
+  }
+  if (D.ex.display === 'label') {
+    const label = st ? st.events[0].label : '✓';
+    wrap.innerHTML = '';
+    wrap.append(h('div', { class: 'label-card' }, h('div', { class: 'big' }, label), h('div', { class: 'sub' }, 'Any octave, any inversion')));
+    return;
+  }
+  const current = new Set(st && !D.finished ? st.events : []);
+  try {
+    renderScore(wrap, D.ex.score, { current, cursorEvents: [...current] });
+  } catch (e) {
+    console.error(e);
+    wrap.innerHTML = `<p style="padding:16px;color:#b91c1c">Could not draw this exercise: ${e.message}</p>`;
+  }
+}
+
+function theoryView() {
+  return h('div', {}, h('h2', {}, 'Theory'), h('p', { class: 'muted' }, 'Short notes on what the exercises use. Each card also appears the first time you open a level that needs it.'),
+    h('div', { class: 'grid' }, Object.values(THEORY).map(c => h('div', { class: 'card theory' }, h('h3', {}, c.title), h('div', { html: c.html })))));
+}
+
+function settingsView() {
+  const set = (k, v) => { settings[k] = v; Store.save(); if (k === 'midiOut') Midi.refresh(); if (k === 'qwerty') qwertyInfo(); if (k === 'showKeys') applyShowKeys(); };
+  const sel = (k, opts) => h('select', { onchange: e => set(k, e.target.value) }, opts.map(([v, t]) => h('option', { value: v, selected: settings[k] === v }, t)));
+  const chk = k => h('input', { type: 'checkbox', checked: settings[k], onchange: e => set(k, e.target.checked) });
+  const numIn = (k, min, max, step = 1) => h('input', { type: 'number', min, max, step, value: settings[k], style: 'width:80px', onchange: e => set(k, +e.target.value) });
+  const row = (label, ctl, help) => h('tr', {}, h('td', {}, h('b', {}, label), help ? h('div', { class: 'muted small' }, help) : null), h('td', {}, ctl));
+  const importInput = h('input', { type: 'file', accept: 'application/json', hidden: true, onchange: e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    f.text().then(txt => {
+      const d = JSON.parse(txt);
+      if (!d || typeof d.levels !== 'object') throw new Error('not a Piano Trainer export');
+      localStorage.setItem(STORE_KEY, JSON.stringify(d));
+      Store.load(); applyShowKeys(); toast('Progress imported'); renderView();
+    }).catch(err => toast('Import failed: ' + err.message));
+  } });
+  let resetArmed = false;
+  const resetBtn = h('button', { onclick: () => {
+    if (!resetArmed) { resetArmed = true; resetBtn.textContent = 'Click again to erase all progress'; return; }
+    Store.data = null; localStorage.removeItem(STORE_KEY); Store.load(); applyShowKeys(); toast('Progress reset'); renderView();
+  } }, 'Reset progress');
+
+  return h('div', {}, h('h2', {}, 'Settings'),
+    h('div', { class: 'card' }, h('h3', {}, 'Input'), h('table', { class: 'set' },
+      row('MIDI input', sel('midiIn', [['all', 'All devices'], ...Midi.inputs().map(i => [i.id, i.name])]),
+        'Roland FP-10: connect USB (USB-B on the piano) or pair Bluetooth in Audio MIDI Setup. Use Chrome or Edge.'),
+      row('Microphone', h('button', { onclick: async () => { if (Mic.stream) Mic.stop(); else await Mic.start(); renderView(); } }, Mic.stream ? 'Turn off' : 'Turn on'),
+        'For pianos without MIDI. Detects one note at a time: fine for reading drills, unreliable for chords.'),
+      row('Navigate with the piano', h('span', { class: 'muted small' }, 'Always on'),
+        'In an exercise, A0 restarts it, A♯0 plays Listen, B0 goes to the previous one and C1 to the next. Highest key (C8) turns navigate mode on and off. Then G7 and A7 step between buttons, F7 and B7 jump between sections, G♯7 presses, E7 goes Home. Starting an exercise turns it off.'),
+      row('Computer keyboard as piano', chk('qwerty'), 'A W S E D F T G … play notes. Z and X change octave. Space and V tap rhythms.'),
+      row('Timing offset (ms)', numIn('latencyMs', -200, 200, 5), 'If tempo mode always says you are late, raise this by that amount.'),
+      row('"Right on time" window (ms)', numIn('goodMs', 30, 250, 10)),
+      row('Counted-as-hit window (ms)', numIn('okMs', 80, 400, 10)))),
+    h('div', { class: 'card' }, h('h3', {}, 'Sound'), h('table', { class: 'set' },
+      row('Demo notes play on', sel('demoSound', [['piano', 'The piano (MIDI out), if connected'], ['computer', 'This computer']])),
+      row('MIDI output', sel('midiOut', [['auto', 'Automatic'], ['none', 'None'], ...Midi.outputs().map(o => [o.id, o.name])])),
+      row('Sound for on-screen and computer keys', chk('keySound'), 'Plays on the piano when MIDI out is connected, otherwise on this computer.'),
+      row('App notes volume', h('input', { type: 'range', min: 0.1, max: 1, step: 0.05, value: settings.appVol, oninput: e => set('appVol', +e.target.value) }),
+        'Demos, ear-training questions and on-screen keys. Works for both the piano and this computer.'),
+      row('Piano volume method', sel('pianoVolMethod', [['sysex', 'Master volume (SysEx)'], ['cc7', 'Channel volume (CC7)']]),
+        'Used by the Piano 🔊 slider in the header. If one method does nothing on your piano, try the other.'),
+      row('Metronome volume', h('input', { type: 'range', min: 0, max: 1, step: 0.05, value: settings.metroVol, oninput: e => set('metroVol', +e.target.value) })))),
+    h('div', { class: 'card' }, h('h3', {}, 'Display and help'), h('table', { class: 'set' },
+      row('Show on-screen keyboard', chk('showKeys'), 'Hide it to give the music more room. MIDI and computer keys still work.'),
+      row('Show finger numbers', chk('showFingers')),
+      row('Show note names', chk('showNames'), 'Helpful at first. Turn it off once you can read the notes.'),
+      row('Highlight keys to press', sel('hints', [['after-error', 'After a wrong note'], ['always', 'Always'], ['never', 'Never']])))),
+    h('div', { class: 'card' }, h('h3', {}, 'Progress'),
+      h('p', { class: 'muted small' }, 'Progress is saved in this browser only. Export now and then as a backup, or to move it to another computer.'),
+      h('div', { class: 'row' },
+        h('button', { onclick: () => {
+          const a = h('a', { href: URL.createObjectURL(new Blob([JSON.stringify(Store.data, null, 2)], { type: 'application/json' })), download: `piano-trainer-${today()}.json` });
+          a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        } }, 'Export'),
+        h('button', { onclick: () => importInput.click() }, 'Import'), importInput, resetBtn)));
+}
+
+/* =========================================================================
+   Boot
+   ========================================================================= */
+function boot() {
+  Store.load();
+  if (window.__vfFailed || !window.Vex) {
+    const el = document.getElementById('load-error');
+    el.hidden = false;
+    el.textContent = 'The notation library (VexFlow) did not load. Either you are offline, or the file failed its integrity check (SRI). Exercises need it to draw music.';
+  }
+  document.querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', () => go(b.dataset.nav)));
+  Keyboard.mount(document.getElementById('kbd'));
+  document.getElementById('kbd-toggle').addEventListener('click', () => { settings.showKeys = !settings.showKeys; Store.save(); applyShowKeys(); });
+  applyShowKeys();
+  Input.on(onInput);
+  window.addEventListener('keydown', e => onKey(e, true));
+  window.addEventListener('keyup', e => onKey(e, false));
+  window.addEventListener('resize', () => { if (currentView === 'drill') drawScoreOnly(); });
+  document.addEventListener('pointerdown', () => Sound.ctx(), { once: true });
+  window.addEventListener('pagehide', () => Sound.stopAll());
+  qwertyInfo();
+  const vol = document.getElementById('piano-vol');
+  vol.value = settings.pianoVol;
+  // The piano's own control may have moved since last time, so only send when the slider moves.
+  vol.addEventListener('input', () => { settings.pianoVol = +vol.value; Store.save(); Midi.setVolume(settings.pianoVol); });
+  Midi.init();
+  window.addEventListener('hashchange', openRoute);
+  document.addEventListener('visibilitychange', () => Wake.update());
+  openRoute();
+}
+if (typeof document !== 'undefined') boot();
+</script>
+</body>
+</html>
