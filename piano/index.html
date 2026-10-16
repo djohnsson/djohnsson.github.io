@@ -37,6 +37,12 @@ header.top { position: sticky; top: 0; z-index: 5; display: flex; align-items: c
 header.top .brand { font-weight: 700; font-size: 17px; margin-right: 8px; }
 header.top nav { display: flex; gap: 4px; }
 header.top .chips { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+/* The piano key that does the same as a button, shown on the button. */
+.pkey { display: inline-block; margin-left: 6px; padding: 0 5px; border-radius: 4px; font-size: 11px; line-height: 16px;
+  font-weight: 600; color: var(--muted); border: 1px solid var(--line); background: var(--bg); vertical-align: 1px; }
+button.primary .pkey { color: #fff; border-color: rgba(255, 255, 255, .5); background: transparent; }
+.pkeys { display: flex; gap: 4px 14px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+.pkeys .pkey { margin: 0 4px 0 0; }
 .chip { font-size: 12px; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
 .chip.on { color: var(--ok); border-color: var(--ok); }
 .chip.warn { color: var(--warn); border-color: var(--warn); }
@@ -1096,10 +1102,19 @@ const isUnlocked = (track, i) => track.free || i === 0 || Store.level(levelKey(t
    Input: MIDI, computer keyboard, on-screen keys, microphone
    ========================================================================= */
 const Input = {
-  listeners: new Set(), held: new Set(), pedal: false,
+  listeners: new Set(), held: new Set(), heldAt: new Map(), pedal: false,
   on(fn) { this.listeners.add(fn); },
   emit(ev) { for (const fn of this.listeners) fn(ev); },
   noteOn(midi, vel = 80, t = performance.now(), src = '') {
+    // A second note-on for a key that is already down, within a few milliseconds, is the same
+    // keypress arriving twice: the piano connected over both USB and Bluetooth with "All devices".
+    // Without this, the copy is graded against the next note and shows as wrong. Later, it is a
+    // real new strike after a note-off that Bluetooth lost.
+    if (this.held.has(midi)) {
+      if (performance.now() - this.heldAt.get(midi) < 80) return;
+      this.noteOff(midi);
+    }
+    this.heldAt.set(midi, performance.now());
     // The FP-10 makes its own sound; on-screen and computer keys need ours.
     if ((src === 'screen' || src === 'qwerty') && settings.keySound) Sound.liveOn(midi, vel);
     this.held.add(midi);
@@ -1138,6 +1153,8 @@ const Midi = {
     } catch (e) { chip.textContent = 'MIDI: blocked'; chip.className = 'chip warn'; }
   },
   inputs() { return this.access ? [...this.access.inputs.values()] : []; },
+  /** The inputs the app listens to right now (Settings → MIDI input). */
+  connectedInputs() { return this.inputs().filter(i => i.state === 'connected' && (settings.midiIn === 'all' || i.id === settings.midiIn)); },
   outputs() { return this.access ? [...this.access.outputs.values()] : []; },
   /** Piano volume, 0..1. SysEx master volume needs a separate Chrome permission, asked for on first use. */
   async setVolume(v) {
@@ -1163,6 +1180,9 @@ const Midi = {
     else if (settings.midiOut !== 'auto') this.out = outs.find(o => o.id === settings.midiOut) || null;
     else this.out = outs.find(o => /roland|fp-?\d+|piano/i.test(o.name)) || outs.find(o => !/iac|through/i.test(o.name)) || null;
     const ins = this.inputs().filter(i => i.state === 'connected');
+    // The microphone would only hear this same piano, a little late and sometimes an octave off,
+    // and every note would be graded twice.
+    if (this.connectedInputs().length && Mic.stream) { Mic.stop(); toast('Microphone turned off: the piano is connected over MIDI', 3500); }
     const chip = document.getElementById('chip-midi');
     chip.textContent = ins.length ? 'MIDI: ' + ins.map(i => i.name).join(', ') : 'MIDI: no device';
     chip.className = 'chip ' + (ins.length ? 'on' : 'warn');
@@ -1236,6 +1256,7 @@ function detectPitch(buf, sr) {
 const Mic = {
   stream: null, analyser: null, buf: null, timer: null, current: null, cand: null, count: 0, lastRms: 0,
   async start() {
+    if (Midi.connectedInputs().length) { toast('Not needed: the piano is connected over MIDI'); return false; }
     try {
       this.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
     } catch (e) { toast('Microphone blocked: ' + e.message); return false; }
@@ -1708,7 +1729,14 @@ let session = null;    // today's suggested session while working through it
 /** True when every generated exercise is the same, so "New exercise" would change nothing. */
 function isFixed() { return D.level.fixed ?? !!D.track.fixed; }
 function nextExerciseBtn(cls = '') {
-  return D.idx + 1 < D.track.levels.length ? h('button', { class: cls, onclick: () => openLevel(D.track.id, D.idx + 1), title: 'Piano: C1' }, 'Next exercise →') : null;
+  return D.idx + 1 < D.track.levels.length ? h('button', { class: cls, onclick: () => openLevel(D.track.id, D.idx + 1), title: 'Piano: C1' }, 'Next exercise →', pkey('C1')) : null;
+}
+const pkey = name => h('span', { class: 'pkey', 'aria-hidden': 'true' }, name);
+/** Every piano shortcut on the exercise page, including the ones without a button. */
+function pianoKeysLegend() {
+  const items = [['A0', 'Restart'], ['A♯0', D.ex.display === 'ear' ? 'Play again' : 'Listen'], ['B0', 'Previous exercise'], ['C1', 'Next exercise'], ['C8', 'Navigate mode']];
+  if (D.ex.display === 'label') items.splice(1, 1);
+  return h('div', { class: 'pkeys muted small' }, 'On the piano:', items.map(([k, what]) => h('span', {}, pkey(k), what)));
 }
 
 function openLevel(trackId, idx) {
@@ -2755,14 +2783,14 @@ function drillView() {
   controls.append(h('span', { class: 'spacer' }));
   if (level.theory && Store.data.theorySeen[level.theory] && !D.showTheory) controls.append(h('button', { onclick: () => { D.showTheory = true; renderView(); } }, '? Theory'));
   if (D.ex.display === 'ear') {
-    controls.append(h('button', { class: D.earStarted ? '' : 'primary', onclick: () => earPlay(D.ex.refEach || !D.earStarted) }, D.earStarted ? '🔊 Play again' : '▶ Start'));
+    controls.append(h('button', { class: D.earStarted ? '' : 'primary', onclick: () => earPlay(D.ex.refEach || !D.earStarted) }, D.earStarted ? '🔊 Play again' : '▶ Start', pkey('A♯0')));
     if (D.ex.reference) controls.append(h('button', { onclick: () => { for (const m of D.ex.reference) Sound.tone(m, performance.now() + 50, 800); } }, 'Reference'));
   } else if (D.ex.display !== 'label') {
     controls.append(D.running === 'demo'
-      ? h('button', { class: 'primary', onclick: stopAndReset }, '■ Stop')
-      : h('button', { disabled: D.running === 'tempo', onclick: () => startTimeline(true), title: 'Piano: A♯0' }, '▶ Listen'));
+      ? h('button', { class: 'primary', onclick: stopAndReset }, '■ Stop', pkey('A♯0'))
+      : h('button', { disabled: D.running === 'tempo', onclick: () => startTimeline(true), title: 'Piano: A♯0' }, '▶ Listen', pkey('A♯0')));
   }
-  controls.append(h('button', { onclick: restartRun, title: 'Piano: lowest key (A0)' }, '↺ Restart'));
+  controls.append(h('button', { onclick: restartRun, title: 'Piano: lowest key (A0)' }, '↺ Restart', pkey('A0')));
   if (!isFixed() && !D.level.piece) controls.append(h('button', { onclick: () => newExercise(true) }, 'New exercise'));
   controls.append(nextExerciseBtn());
   if (D.mode === 'tempo') {
@@ -2771,6 +2799,7 @@ function drillView() {
       : h('button', { class: 'primary', disabled: D.running === 'demo', onclick: () => startTimeline(false) }, 'Start'));
   }
   root.append(controls);
+  root.append(pianoKeysLegend());
 
   // Results go above the score: the score fills the space down to the fixed keyboard, so anything below it is hidden.
   if (D.finished) root.append(resultsCard(D.finished));
@@ -2799,7 +2828,7 @@ function resultsCard(res) {
     h('div', { class: 'big' }, res.pass ? '✓ ' + msg : msg),
     h('div', { class: 'stats' }, stats),
     h('div', { class: 'row' },
-      h('button', { onclick: restartRun }, 'Same again'),
+      h('button', { onclick: restartRun }, 'Same again', pkey('A0')),
       !isFixed() && !D.level.piece ? h('button', { class: res.pass ? '' : 'primary', onclick: () => newExercise(true) }, 'New exercise') : null,
       nextExerciseBtn(res.pass && !inSession ? 'primary' : ''),
       inSession ? h('button', { class: 'primary', onclick: () => { session.n++; const it = session.items[session.n]; openLevel(it.track.id, it.idx); } }, 'Next in session →') : null));
@@ -2861,7 +2890,7 @@ function theoryView() {
 }
 
 function settingsView() {
-  const set = (k, v) => { settings[k] = v; Store.save(); if (k === 'midiOut') Midi.refresh(); if (k === 'qwerty') qwertyInfo(); if (k === 'showKeys') applyShowKeys(); };
+  const set = (k, v) => { settings[k] = v; Store.save(); if (k === 'midiOut' || k === 'midiIn') Midi.refresh(); if (k === 'qwerty') qwertyInfo(); if (k === 'showKeys') applyShowKeys(); };
   const sel = (k, opts) => h('select', { onchange: e => set(k, e.target.value) }, opts.map(([v, t]) => h('option', { value: v, selected: settings[k] === v }, t)));
   const chk = k => h('input', { type: 'checkbox', checked: settings[k], onchange: e => set(k, e.target.checked) });
   const numIn = (k, min, max, step = 1) => h('input', { type: 'number', min, max, step, value: settings[k], style: 'width:80px', onchange: e => set(k, +e.target.value) });
@@ -2886,8 +2915,10 @@ function settingsView() {
     h('div', { class: 'card' }, h('h3', {}, 'Input'), h('table', { class: 'set' },
       row('MIDI input', sel('midiIn', [['all', 'All devices'], ...Midi.inputs().map(i => [i.id, i.name])]),
         'Roland FP-10: connect USB (USB-B on the piano) or pair Bluetooth in Audio MIDI Setup. Use Chrome or Edge.'),
-      row('Microphone', h('button', { onclick: async () => { if (Mic.stream) Mic.stop(); else await Mic.start(); renderView(); } }, Mic.stream ? 'Turn off' : 'Turn on'),
-        'For pianos without MIDI. Detects one note at a time: fine for reading drills, unreliable for chords.'),
+      row('Microphone', h('button', { disabled: !Mic.stream && Midi.connectedInputs().length > 0,
+          onclick: async () => { if (Mic.stream) Mic.stop(); else await Mic.start(); renderView(); } }, Mic.stream ? 'Turn off' : 'Turn on'),
+        Midi.connectedInputs().length ? 'Not needed while the piano is connected over MIDI, so it is off.'
+          : 'For pianos without MIDI. Detects one note at a time: fine for reading drills, unreliable for chords.'),
       row('Navigate with the piano', h('span', { class: 'muted small' }, 'Always on'),
         'In an exercise, A0 restarts it, A♯0 plays Listen, B0 goes to the previous one and C1 to the next. Highest key (C8) turns navigate mode on and off. Then G7 and A7 step between buttons, F7 and B7 jump between sections, G♯7 presses, E7 goes Home. Starting an exercise turns it off.'),
       row('Computer keyboard as piano', chk('qwerty'), 'A W S E D F T G … play notes. Z and X change octave. Space and V tap rhythms.'),
