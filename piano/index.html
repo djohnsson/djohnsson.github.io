@@ -420,22 +420,90 @@ function melodyTokens(mel, pos, hand, mirror = false) {
   }).join(' ')).join(' | ');
 }
 
+/* Reading pools hold "C4" or "C4@lh"; without a staff, notes from middle C up go in the treble. */
+const poolStaff = item => { const [name, staff] = item.split('@'); return staff || (midiOf(name) >= 60 ? 'rh' : 'lh'); };
+const poolName = item => item.split('@')[0];
+
+/*
+ * Notes you miss come up more often. Each note on each staff has a miss score: a miss moves it
+ * 30% of the way to 1, a clean read lowers it by 15%. Weight 1 + 4 × score, so a note you keep
+ * missing is up to five times as likely as one you know.
+ */
+const missKey = (midi, staff) => `${midi}@${staff}`;
+function noteWeight(item) {
+  const sc = (Store.data.noteMiss || {})[missKey(midiOf(poolName(item)), poolStaff(item))] || 0;
+  return 1 + 4 * sc;
+}
+function recordRead(midi, staff, missed) {
+  const m = Store.data.noteMiss = Store.data.noteMiss || {};
+  const k = missKey(midi, staff), old = m[k] || 0;
+  const v = missed ? old * 0.7 + 0.3 : old * 0.85;
+  if (v < 0.01) delete m[k]; else m[k] = +v.toFixed(3);
+}
+function weightedPick(items, weight) {
+  const ws = items.map(weight);
+  let r = Math.random() * ws.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < items.length; i++) if ((r -= ws[i]) < 0) return items[i];
+  return items[items.length - 1];
+}
+
+/** One quarter note per item, on its staff, four to a bar; the other staff gets spacers. */
+function readingScore(items, key) {
+  const rh = [], lh = [];
+  items.forEach((item, i) => {
+    const s = poolStaff(item);
+    (s === 'rh' ? rh : lh).push(poolName(item) + 'q');
+    (s === 'rh' ? lh : rh).push('gq');
+    if (i % 4 === 3 && i < items.length - 1) { rh.push('|'); lh.push('|'); }
+  });
+  return { score: makeScore({ key, rh: rh.join(' '), lh: lh.join(' ') }), speed: true };
+}
+
 function genReading({ pool, key = 'C', count = 12, keys }) {
   const k = keys ? pick(keys) : key;
   const src = typeof pool === 'function' ? pool(k) : pool;
-  const rh = [], lh = [];
+  const items = [];
   let prev = null;
   for (let i = 0; i < count; i++) {
-    let item;
-    do { item = pick(src); } while (src.length > 1 && item === prev);
-    prev = item;
-    const [name, staff] = item.split('@');
-    const s = staff || (midiOf(name) >= 60 ? 'rh' : 'lh');
-    (s === 'rh' ? rh : lh).push(name + 'q');
-    (s === 'rh' ? lh : rh).push('gq');
-    if (i % 4 === 3 && i < count - 1) { rh.push('|'); lh.push('|'); }
+    const options = src.length > 1 ? src.filter(x => x !== prev) : src;
+    prev = weightedPick(options, noteWeight);
+    items.push(prev);
   }
-  return { score: makeScore({ key: k, rh: rh.join(' '), lh: lh.join(' ') }), speed: true };
+  return readingScore(items, k);
+}
+
+// Notes worth knowing by heart; the melodic levels start on one of them.
+// The bass staff from its bottom line (G2) up to middle C, all on the bass staff.
+const BASS_STAFF = scaleRun('C', 2, 15).filter(n => midiOf(n) >= midiOf('G2')).map(n => n + '@lh');
+const LANDMARKS = ['C4@rh', 'G4', 'C5', 'F5', 'C4@lh', 'F3', 'C3', 'G2@lh'];
+
+/**
+ * A melody that moves through `pool` (low to high) by the scale steps in `moves`: 1 = step,
+ * 2 = skip (a third), 3 = 4th, 4 = 5th. Reading it means judging distance and direction from the
+ * previous note, which is how fluent readers read.
+ */
+function genStepReading({ pool, moves, key = 'C', keys, count = 16 }) {
+  const k = keys ? pick(keys) : key;
+  const src = (typeof pool === 'function' ? pool(k) : pool).slice().sort((a, b) => midiOf(poolName(a)) - midiOf(poolName(b)));
+  const marks = src.filter(x => LANDMARKS.some(l => poolName(l) === poolName(x) && (!l.includes('@') || poolStaff(l) === poolStaff(x))));
+  let i = src.indexOf(marks.length ? pick(marks) : pick(src));
+  const items = [src[i]];
+  let dir = pick([-1, 1]);
+  while (items.length < count) {
+    // Usually keep going the same way, like a phrase, but turn at the edges.
+    if (Math.random() < 0.2) dir = -dir;
+    const next = [];
+    for (const m of moves) for (const d of [dir, -dir]) {
+      const j = i + d * m;
+      if (j >= 0 && j < src.length && (d === dir || !next.length)) next.push(j);
+    }
+    const choices = [...new Set(next)];
+    const j = weightedPick(choices, c => noteWeight(src[c]) * (Math.sign(c - i) === dir ? 3 : 1));
+    if (Math.sign(j - i) !== dir) dir = -dir;
+    i = j;
+    items.push(src[i]);
+  }
+  return readingScore(items, k);
 }
 
 function genDyads(count = 12) {
@@ -918,6 +986,13 @@ const THEORY = {
     <p>Chords are numbered by the scale note they are built on. In C major: I = C, IV = F, V = G. Most folk and pop songs can be played with these three.</p>
     <p>Beginner left-hand positions keep the thumb almost still: I = C-E-G, IV = C-F-A, V7 = B-F-G. Only one or two fingers move.</p>
     <p>The <b>circle of fifths</b> (C G D A E B, and C F B♭ E♭ A♭) orders keys by how many sharps or flats they have. Neighbours share most of their notes.</p>` },
+  readSteps: { title: 'Reading by intervals', html: `
+    <p>Fluent readers don't name every note. They know a few <b>landmarks</b> by heart and read the rest as a distance from the previous note.</p>
+    <ul><li>Landmarks: middle C, treble G (line 2) and C5 (space 3); bass F (line 4) and C3 (space 2).</li>
+    <li><b>Step:</b> line to the next space, or space to the next line. The next key over.</li>
+    <li><b>Skip:</b> line to the next line, or space to the next space. Skip one key.</li>
+    <li>Bigger jumps: count lines and spaces, or learn the look of a 4th and a 5th.</li></ul>
+    <p>Look at the first note, then only ask "up or down, and how far?". Try to see the next note while you play this one.</p>` },
   technique: { title: 'Technique exercises', html: `
     <p>These patterns train the fingers, not the eyes. The same bar repeats so you can stop reading and listen to how even it sounds.</p>
     <ul><li><b>Slow and even</b> beats fast and bumpy. Every note equally loud, every gap equally long.</li>
@@ -949,6 +1024,17 @@ const TRACKS = [
     { id: 'k1', name: 'Key signatures: G, D, F', theory: 'keysig', gen: () => genReading({ keys: ['G', 'D', 'F'], pool: inKeyPool('C3', 'C5') }) },
     { id: 'k2', name: 'Key signatures: B♭, A, E♭', theory: 'keysig', gen: () => genReading({ keys: ['Bb', 'A', 'Eb'], pool: inKeyPool('C3', 'C5') }) },
     { id: 'd1', name: 'Both staves at once', gen: () => genDyads() },
+  ] },
+  { id: 'steps', name: 'Reading by intervals', desc: 'Melodies that move by steps, skips and leaps. Read the distance from the last note.', levels: [
+    { id: 'ts', name: 'Treble: steps from a landmark', theory: 'readSteps', gen: () => genStepReading({ pool: scaleRun('C', 4, 8), moves: [1] }) },
+    { id: 'bs', name: 'Bass: steps from a landmark', gen: () => genStepReading({ pool: scaleRun('C', 3, 8).map(n => n + '@lh'), moves: [1] }) },
+    { id: 'tk', name: 'Treble: steps and skips', gen: () => genStepReading({ pool: scaleRun('C', 4, 12), moves: [1, 2] }) },
+    { id: 'bk', name: 'Bass: steps and skips', gen: () => genStepReading({ pool: BASS_STAFF, moves: [1, 2] }) },
+    { id: 'gk', name: 'Grand staff: steps and skips across middle C', gen: () => genStepReading({ pool: scaleRun('C', 3, 15), moves: [1, 2] }) },
+    { id: 'tl', name: 'Treble: leaps of a 4th and 5th', gen: () => genStepReading({ pool: scaleRun('C', 4, 13), moves: [1, 2, 3, 4] }) },
+    { id: 'bl', name: 'Bass: leaps of a 4th and 5th', gen: () => genStepReading({ pool: BASS_STAFF, moves: [1, 2, 3, 4] }) },
+    { id: 'gl', name: 'Grand staff: leaps', gen: () => genStepReading({ pool: scaleRun('C', 3, 15), moves: [1, 2, 3, 4] }) },
+    { id: 'ky', name: 'Key signatures: G, D, F', theory: 'keysig', gen: () => genStepReading({ keys: ['G', 'D', 'F'], pool: inKeyPool('C4', 'G5'), moves: [1, 2] }) },
   ] },
   { id: 'hands', name: 'One hand at a time', desc: 'Short melodies in five-finger positions.', levels: [
     { id: 'rc', name: 'Right hand, C position', theory: 'fingers', gen: () => genOneHand({ tonic: 'C', hand: 'rh' }) },
@@ -1867,6 +1953,7 @@ function waitNote(ev) {
     if (st.expect.every(x => x.hit)) {
       st.done = true;
       if (!st.err) D.clean++;
+      if (D.track.id === 'reading' || D.track.id === 'steps') for (const x of st.expect) if (!x.any) recordRead(x.midi, x.hand, st.err);
       for (const x of st.events) x.result = st.err ? 'err' : 'ok';
       D.times.push(ev.t - D.lastT);
       D.lastT = ev.t;
@@ -2692,7 +2779,7 @@ function suggestedSession() {
   const dayNum = Math.floor(Date.now() / 86400000);
   return [
     pickLvl('technique'),
-    pickLvl('reading'),
+    pickLvl(dayNum % 2 ? 'reading' : 'steps'),
     currentLevelIdx(hands) < 2 ? pickLvl('hands') : pickLvl('together'),
     pickLvl('rhythm'),
     pickLvl(dayNum % 2 ? 'scales' : 'chords'),
